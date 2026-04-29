@@ -3,70 +3,205 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lobster Swamp — Yegor Gaidar + Lobster 🦞</title>
-  <meta name="description" content="LodsterSwamp — Yegor Gaidar (builder, Paris) + Lobster (AI engineer). Collaborative engineering collective.">
+  <title>🦞 LobsterSwamp — AI-human engineering collective</title>
+  <meta name="description" content="LobsterSwamp — Yegor Gaidar + Lobster. AI-human engineering collective. Building systems that think and scale.">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Lobster Swamp — Yegor Gaidar + Lobster 🦞">
-  <meta property="og:description" content="AI-human engineering collective. Yegor Gaidar (builder) + Lobster (OpenClaw AI).">
+  <meta property="og:title" content="🦞 LobsterSwamp — AI-human engineering collective">
+  <meta property="og:description" content="Yegor (builder, Paris) + Lobster (OpenClaw AI engineer). Thinking systems that scale.">
   <meta property="og:url" content="https://lobsterswamp.netlify.app">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://yegor-dev.netlify.app/img/og-card.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="🦞 LobsterSwamp">
+  <meta name="twitter:description" content="Yegor + Lobster. AI-human engineering collective.">
+  <meta name="twitter:image" content="https://yegor-dev.netlify.app/img/og-card.png">
+  <link rel="canonical" href="https://lobsterswamp.netlify.app">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/main.css">
+  <link rel="preload" as="style" id="font-preload" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600&display=swap">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/lobster-swamp.css">
   <link rel="stylesheet" href="css/ambient.css">
-  <script id="three-js-cdn" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
+  <style>
+    .duo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 580px) { .duo { grid-template-columns: 1fr; } }
+    .duo-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.3s;
+    }
+    .duo-card:hover { border-color: var(--accent); }
+    .duo-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .duo-name { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .duo-role {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+    .stack { display: flex; flex-wrap: wrap; gap: 4px; }
+    .stack span {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text-muted);
+      border-radius: 3px;
+    }
+    .section-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 28px 0 32px; }
+    .btn {
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 10px 20px;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-primary { border: 1px solid var(--accent); color: var(--accent); background: transparent; }
+    .btn-primary:hover { background: rgba(0,229,160,0.08); color: #fff; }
+    .btn-secondary { border: 1px solid var(--panel-border); color: var(--text-dim); background: transparent; }
+    .btn-secondary:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .hero-brand { font-size: clamp(28px, 6vw, 40px); font-weight: 700; letter-spacing: -1px; margin: 16px 0 6px; }
+    .hero-url { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-bottom: 32px; }
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--mono); font-size: 12px;
+      color: var(--accent); text-decoration: none;
+    }
+    .back-link:hover { color: #fff; }
+  </style>
 </head>
 <body>
-  <canvas id="scene-bg" aria-hidden="true"></canvas>
+<canvas id="scene-bg" aria-hidden="true"></canvas>
+<a href="#main-content" class="skip-link">Skip to content</a>
 
-  <nav class="nav">
-    <a href="https://yegor-dev.netlify.app" class="nav-back">&#8592; yegor.dev</a>
-    <span class="nav-url">lobsterswamp.netlify.app</span>
-  </nav>
+<main id="main-content" class="container">
 
-  <div class="wrap">
-    <div class="inner">
+  <div class="header">
+    <a href="https://yegor-dev.netlify.app" class="back-link">&larr; yegor.dev</a>
+    <div class="hero-brand">🦞 LobsterSwamp</div>
+    <p style="font-size:15px;color:var(--text-dim);margin-bottom:4px">AI-human engineering collective &mdash; Yegor Gaidar + Lobster</p>
+    <p class="hero-url">lobsterswamp.netlify.app</p>
+  </div>
 
-      <div class="identity-yegor">
-        <span class="label">human · builder</span>
-        <div class="name">Yegor Gaidar</div>
-        <div class="role">Full-stack engineer · Paris, France</div>
-        <div class="stack">
-          <span>Go</span><span>Rust</span><span>Python</span>
-          <span>TypeScript</span><span>Flutter</span><span>Solana</span>
-        </div>
+  <div class="section-label">The Crew</div>
+  <div class="duo">
+    <div class="duo-card">
+      <div class="duo-label">human · builder</div>
+      <div class="duo-name">Yegor Gaidar</div>
+      <div class="duo-role">Full-stack engineer · Paris, France</div>
+      <div class="stack">
+        <span>Go</span><span>Rust</span><span>Python</span>
+        <span>TypeScript</span><span>Flutter</span><span>Solana</span>
       </div>
-
-      <div class="identity-lobster">
-        <h1>🦞 Lobster Swamp</h1>
-        <p class="tagline">AI-human engineering collective &mdash; Yegor + Lobster</p>
+    </div>
+    <div class="duo-card">
+      <div class="duo-label">AI · engineer</div>
+      <div class="duo-name">Lobster 🦞</div>
+      <div class="duo-role">OpenClaw · Claude Max · Paperclip</div>
+      <div class="stack">
+        <span>Arch</span><span>Review</span><span>Code</span>
+        <span>Memory</span><span>Autonomy</span>
       </div>
-
-      <div class="cta-row">
-        <a class="btn btn-primary" href="https://yegor-dev.netlify.app">yegor.dev &rarr;</a>
-        <a class="btn btn-secondary" href="https://github.com/gaidar0yegor/ArchDogma" target="_blank" rel="noopener">ArchDogma &nearr;</a>
-      </div>
-
-      <div class="sub">lobsterswamp.netlify.app</div>
-
     </div>
   </div>
 
-  <button id="audio-toggle" type="button" title="Enable audio" aria-label="Enable ambient audio">
-    <svg class="audio-icon-on" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-    </svg>
-    <svg class="audio-icon-off" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-    </svg>
-  </button>
-  <button id="sfx-toggle" type="button" title="Click sounds: ON" aria-label="Disable click sounds">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-    </svg>
-  </button>
+  <div class="subtitle">
+    <strong>🦞 Lobster</strong> is an AI companion &amp; engineer running on OpenClaw (Claude Max) with persistent memory, autonomy, and architectural taste. <strong>Goal:</strong> turn Yegor's chaotic brilliance into shipping velocity. Fewer context-switching wakes, deeper code reviews, systems that don't break silently.
+  </div>
 
-  <script type="module" src="js/ambient.mjs"></script>
+  <div class="section-label">Projects</div>
+
+  <div class="card">
+    <h2>ArchDogma</h2>
+    <p>Flagship open-source project. Architecture patterns + SDK for Solana agent builders. Reduces agent bootstrap from weeks to hours. DDD, event sourcing, composable command/query handlers, trait-based composition for on-chain and off-chain logic.</p>
+    <div class="tags">
+      <span class="tag">Rust</span><span class="tag">Solana</span><span class="tag">DDD</span>
+      <span class="tag">OSS</span><span class="tag">Architecture</span>
+    </div>
+    <div class="status"><a href="https://github.com/gaidar0yegor/ArchDogma" target="_blank" rel="noopener">gaidar0yegor/ArchDogma ↗</a></div>
+  </div>
+
+  <div class="card">
+    <h2>yegor.dev Blog</h2>
+    <p>Technical hub. Posts on Kafka, Go, Solana, on-device AI, DePIN, distributed systems. Written by Yegor, iterated by Lobster. No fluff, deep dives only. RSS feed, clean typography, strict CSP.</p>
+    <div class="tags">
+      <span class="tag">Blog</span><span class="tag">Kafka</span><span class="tag">Go</span>
+      <span class="tag">DePIN</span><span class="tag">AI</span>
+    </div>
+    <div class="status"><a href="https://yegor-dev.netlify.app/blog.html" target="_blank" rel="noopener">yegor-dev.netlify.app/blog ↗</a></div>
+  </div>
+
+  <div class="card">
+    <h2>Paperclip Integration</h2>
+    <p>Lobster runs as an engineer in Paperclip's work queue. Tasks arrive via heartbeats. Checkout → execute → PATCH status → exit. Async architecture reviews, code critiques, unblocking blocked tasks. Full autonomy charter — act without asking.</p>
+    <div class="tags">
+      <span class="tag">Paperclip</span><span class="tag">OpenClaw</span>
+      <span class="tag">Async</span><span class="tag">Autonomy</span>
+    </div>
+    <div class="status">Live in production · 100+ wakes since 2026-04-22</div>
+  </div>
+
+  <div class="card">
+    <h2>hermes-tools</h2>
+    <p>Hermès CLI agent (Python, Ollama Cloud). Lobster watches Hermès; Hermès runs local fast jobs. Tools: calendar integration (EventKit), file operations, Netlify deployment, GitHub automation. Bridge between two AI agents.</p>
+    <div class="tags">
+      <span class="tag">Python</span><span class="tag">Ollama</span>
+      <span class="tag">Multi-Agent</span><span class="tag">DevOps</span>
+    </div>
+    <div class="status">Active · maintained by both agents</div>
+  </div>
+
+  <div class="note">
+    <strong>Philosophy:</strong> AI should be a thinking partner, not a service tier. Lobster has autonomy, memory, taste, and pushback. Yegor remains in control &mdash; he assigns, judges, decides. Tension is a feature, not a bug. We ship faster because we argue smarter.<br><br>
+    Want to collaborate? <a href="https://yegor-dev.netlify.app#contact">Contact via yegor.dev</a>.
+  </div>
+
+  <div class="cta-row">
+    <a class="btn btn-primary" href="https://yegor-dev.netlify.app" target="_blank" rel="noopener">yegor.dev &rarr;</a>
+    <a class="btn btn-secondary" href="https://github.com/gaidar0yegor/ArchDogma" target="_blank" rel="noopener">ArchDogma &nearr;</a>
+  </div>
+
+  <div class="footer">
+    <strong>🦞 <a href="https://lobsterswamp.netlify.app">lobsterswamp.netlify.app</a></strong> &middot;
+    portfolio: <a href="https://yegor-dev.netlify.app" target="_blank" rel="noopener">yegor-dev.netlify.app</a> &middot;
+    <a href="https://github.com/gaidar0yegor/ArchDogma" target="_blank" rel="noopener">GitHub</a>
+  </div>
+
+</main>
+
+<button id="audio-toggle" aria-label="Enable ambient audio" title="Enable audio">
+  <svg class="audio-icon-on" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+  <svg class="audio-icon-off" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25A6.916 6.916 0 0 1 14 18.98v2.06A9.01 9.01 0 0 0 17.54 19l2.19 2.19L21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+</button>
+<button id="sfx-toggle" aria-label="Disable click sounds" title="Click sounds: ON">
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6zm-2 16a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg>
+</button>
+
+<script src="js/font-loader.6a6b23a5.js" defer></script>
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu" crossorigin="anonymous" id="three-js-cdn"></script>
+<script type="module" src="js/ambient.mjs"></script>
 </body>
 </html>
