@@ -13,6 +13,12 @@
  *    - Respects prefers-reduced-motion (no cues when set)
  *    - Gracefully silent when /audio/ambient.mp3 is absent
  *
+ *  Minecraft ambient aesthetic:
+ *    - Cave reverb via synthetic convolver impulse response
+ *    - Piano plucks in C minor pentatonic (C418-style note box)
+ *    - Random ambient notes timed like Minecraft's music system
+ *    - Note-block-style SFX click (G5 sine, 80ms)
+ *
  *  Domain Events emitted:
  *    - AUDIO_UNLOCKED (first user interaction)
  *    - AUDIO_MUTED_CHANGED { muted: boolean }
@@ -27,36 +33,67 @@ import { Contexts } from '../shared/types.mjs';
 // ── Constants ───────────────────────────────────────────────
 const STORAGE_KEY   = 'yegor-audio-muted';
 const AMBIENT_SRCS  = ['/audio/ambient.mp3', '/audio/ambient.ogg'];
-const AMBIENT_VOL   = 0.22;   // ambient sits well under any foreground content
-const CUE_VOL       = 0.05;   // section enter chime — subtle
+const AMBIENT_VOL   = 0.18;
+
+// C minor pentatonic across C3–C5 (C18-inspired note palette)
+const MC_PENTATONIC = [130.81, 155.56, 174.61, 196.00, 233.08,
+                       261.63, 311.13, 349.23, 392.00, 466.16, 523.25];
 
 const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 // ── State ───────────────────────────────────────────────────
-let actx          = null;
-let masterGain    = null;
-let ambientGain   = null;
-let ambientSource = null;
-let ambientBuffer = null;
+let actx             = null;
+let masterGain       = null;
+let ambientGain      = null;
+let caveReverb       = null;
+let reverbGain       = null;
+let ambientSource    = null;
+let ambientBuffer    = null;
+let ambientPluckTimer = null;
 let isUnlocked       = false;
-let wasJustUnlocked  = false; // true during the same tick that first-unlock fires
+let wasJustUnlocked  = false;
 let isMuted          = localStorage.getItem(STORAGE_KEY) === '1';
+
+// ── Cave reverb ─────────────────────────────────────────────
+// Synthetic impulse response: random-noise with exponential decay.
+// Approximates the spacious, damp echo of a Minecraft cave.
+
+function buildCaveReverb() {
+  const convolver = actx.createConvolver();
+  const sr  = actx.sampleRate;
+  const len = Math.round(sr * 2.8);
+  const ir  = actx.createBuffer(2, len, sr);
+  for (let c = 0; c < 2; c++) {
+    const d = ir.getChannelData(c);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.4);
+    }
+  }
+  convolver.buffer = ir;
+  return convolver;
+}
 
 // ── AudioContext lifecycle ──────────────────────────────────
 
 function initSync() {
-  // Synchronous setup — called before any async work so that
-  // the click delegation handler (which fires right after) can
-  // immediately read actx / masterGain.
   actx = new (window.AudioContext || window.webkitAudioContext)();
 
   masterGain = actx.createGain();
   masterGain.gain.value = isMuted ? 0 : 1;
   masterGain.connect(actx.destination);
 
+  // Reverb chain: caveReverb → reverbGain → masterGain
+  caveReverb = buildCaveReverb();
+  reverbGain = actx.createGain();
+  reverbGain.gain.value = 0.35;
+  caveReverb.connect(reverbGain);
+  reverbGain.connect(masterGain);
+
+  // Ambient sits low in the mix; feeds both dry and reverb sends
   ambientGain = actx.createGain();
   ambientGain.gain.value = AMBIENT_VOL;
-  ambientGain.connect(masterGain);
+  ambientGain.connect(masterGain);   // dry path
+  ambientGain.connect(caveReverb);   // wet path → cave echo
 }
 
 async function unlockAudio() {
@@ -72,6 +109,7 @@ async function unlockAudio() {
     bus.emit(DomainEvents.AUDIO_UNLOCKED);
 
     loadAndStartAmbient();
+    if (!reduceMotion) scheduleAmbientPlucks();
   } catch (err) {
     console.warn('[Audio] Context init failed:', err);
   }
@@ -88,7 +126,7 @@ async function loadAndStartAmbient() {
       return;
     } catch { /* try next format */ }
   }
-  // No audio file present — cues still work, ambient just silent
+  // No file present — synthesized plucks still play
 }
 
 function startAmbient() {
@@ -100,55 +138,78 @@ function startAmbient() {
   ambientSource.start(0);
 }
 
-// ── Synthesized section cue ─────────────────────────────────
-// Soft sine sweep: C5 → C4 over 350ms. Barely audible — a whisper.
+// ── Piano pluck (C418 style) ────────────────────────────────
+// Sine wave with fast piano attack, slow exponential decay.
+// Fully wet — routes only through caveReverb for maximum space.
 
-function playSectionCue() {
-  if (!actx || isMuted || reduceMotion) return;
+function playPianoPluck(freq, vol = 0.10) {
+  if (!actx || !caveReverb || isMuted) return;
   const t = actx.currentTime;
 
   const osc = actx.createOscillator();
   const env = actx.createGain();
-  osc.connect(env);
-  env.connect(masterGain);
-
   osc.type = 'sine';
-  osc.frequency.setValueAtTime(523.25, t);              // C5
-  osc.frequency.exponentialRampToValueAtTime(261.63, t + 0.25); // C4
+  osc.frequency.value = freq;
 
   env.gain.setValueAtTime(0, t);
-  env.gain.linearRampToValueAtTime(CUE_VOL, t + 0.04);
-  env.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  env.gain.linearRampToValueAtTime(vol, t + 0.008);          // 8ms attack
+  env.gain.exponentialRampToValueAtTime(vol * 0.28, t + 0.14); // decay
+  env.gain.exponentialRampToValueAtTime(0.001, t + 1.8);     // long release
 
+  osc.connect(env);
+  env.connect(caveReverb);
   osc.start(t);
-  osc.stop(t + 0.35);
+  osc.stop(t + 1.8);
+}
+
+// ── Random ambient plucks ───────────────────────────────────
+// Mirrors Minecraft's music system: sparse, irregular notes that
+// feel like they come from the cave itself. 10–35s between notes.
+
+function scheduleAmbientPlucks() {
+  const delay = 10000 + Math.random() * 25000;
+  ambientPluckTimer = setTimeout(() => {
+    if (isUnlocked && !isMuted) {
+      const freq = MC_PENTATONIC[Math.floor(Math.random() * MC_PENTATONIC.length)];
+      playPianoPluck(freq, 0.05 + Math.random() * 0.04);
+    }
+    scheduleAmbientPlucks();
+  }, delay);
+}
+
+// ── Synthesized section cue ─────────────────────────────────
+// Random C minor pentatonic pluck — like a Minecraft note block
+// triggered by entering a new area.
+
+function playSectionCue() {
+  if (!actx || isMuted || reduceMotion) return;
+  const freq = MC_PENTATONIC[3 + Math.floor(Math.random() * 5)]; // C4–Bb4 range
+  playPianoPluck(freq, 0.08);
 }
 
 // ── SFX — Button click sounds ───────────────────────────────
-// Synthesized tick using Web Audio API noise burst. No file needed.
+// G5 sine pluck — mimics Minecraft's harp note block.
 // ON by default; user can toggle off via #sfx-toggle.
 
 const SFX_KEY  = 'yegor-sfx';
-let sfxEnabled = localStorage.getItem(SFX_KEY) !== '0'; // default ON
+let sfxEnabled = localStorage.getItem(SFX_KEY) !== '0';
 
 function playSFXClick() {
   if (!actx || !sfxEnabled) return;
-  const t  = actx.currentTime;
-  const sr = actx.sampleRate;
-  const n  = Math.ceil(sr * 0.02);              // 20 ms noise burst
-  const b  = actx.createBuffer(1, n, sr);
-  const d  = b.getChannelData(0);
-  for (let i = 0; i < n; i++)
-    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 4) * 0.35;
+  const t = actx.currentTime;
 
-  const src = actx.createBufferSource(); src.buffer = b;
-  const bp  = actx.createBiquadFilter();
-  bp.type = 'bandpass'; bp.frequency.value = 2000; bp.Q.value = 1.2;
-  const g   = actx.createGain();
-  g.gain.setValueAtTime(0.3, t);
+  const osc = actx.createOscillator();
+  const env = actx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = 783.99; // G5 — Minecraft harp note block
 
-  src.connect(bp); bp.connect(g); g.connect(actx.destination);
-  src.start(t);
+  env.gain.setValueAtTime(0.18, t);
+  env.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+  osc.connect(env);
+  env.connect(actx.destination);
+  osc.start(t);
+  osc.stop(t + 0.08);
 }
 
 function setSFX(on) {
@@ -168,7 +229,7 @@ function updateSFXUI() {
 function addPixelBurst(el) {
   if (!el || el.closest('#audio-toggle, #sfx-toggle')) return;
   el.classList.remove('btn-sfx-flash');
-  void el.offsetWidth;   // reflow to restart animation
+  void el.offsetWidth;
   el.classList.add('btn-sfx-flash');
   el.addEventListener('animationend', () => el.classList.remove('btn-sfx-flash'), { once: true });
 }
@@ -183,6 +244,13 @@ function setMuted(val) {
     const t = actx.currentTime;
     masterGain.gain.cancelScheduledValues(t);
     masterGain.gain.setTargetAtTime(val ? 0 : 1, t, 0.25);
+  }
+
+  if (val && ambientPluckTimer) {
+    clearTimeout(ambientPluckTimer);
+    ambientPluckTimer = null;
+  } else if (!val && isUnlocked && !ambientPluckTimer && !reduceMotion) {
+    scheduleAmbientPlucks();
   }
 
   updateToggleUI();
@@ -214,8 +282,6 @@ function updateToggleUI() {
 // ── Boot ────────────────────────────────────────────────────
 
 export async function boot() {
-  // First-interaction gate: unlocks AudioContext (browser autoplay policy)
-  // and acts as implicit user consent for the audio experience.
   const GATE_EVENTS = ['click', 'touchstart', 'keydown'];
   const onFirstInteraction = () => {
     unlockAudio();
@@ -225,11 +291,10 @@ export async function boot() {
     document.addEventListener(ev, onFirstInteraction, { passive: true })
   );
 
-  // Ambient mute toggle
   document.addEventListener('click', e => {
     if (e.target.closest('#audio-toggle')) {
       if (wasJustUnlocked) {
-        wasJustUnlocked = false; // consume: this click was the unlock, don't also mute
+        wasJustUnlocked = false;
         updateToggleUI();
         return;
       }
@@ -237,12 +302,10 @@ export async function boot() {
     }
   });
 
-  // SFX toggle
   document.addEventListener('click', e => {
     if (e.target.closest('#sfx-toggle')) setSFX(!sfxEnabled);
   });
 
-  // SFX + pixel burst on every button/chip click
   document.addEventListener('click', e => {
     const target = e.target.closest('button, .ai-prompt-chip, [role="button"]');
     if (!target) return;
@@ -251,12 +314,10 @@ export async function boot() {
     addPixelBurst(target);
   }, { passive: true });
 
-  // Section reveal → section enter cue
   bus.on(DomainEvents.SECTION_REVEALED, () => {
     if (isUnlocked) playSectionCue();
   });
 
-  // Initialise button appearances
   updateToggleUI();
   updateSFXUI();
 
