@@ -1,0 +1,24 @@
+/* Shared base styles for secondary pages (blog, lab, agents, lobster-swamp, etc.) */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#06060e;--text:#e0e0e8;--text-dim:#7a7a8e;--text-muted:#4a4a5e;
+  --accent:#00e5a0;--accent2:#00b4d8;--accent3:#7b61ff;
+  --panel-bg:rgba(8,8,20,0.85);--panel-border:rgba(255,255,255,0.06);
+  --glow:rgba(0,229,160,0.15);
+  --mono:'JetBrains Mono',monospace;--sans:'Space Grotesk',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;min-height:100vh;}
+.container{max-width:700px;margin:0 auto;padding:60px 24px;}
+
+.header{margin-bottom:48px;}
+.header a{font-family:var(--mono);font-size:13px;color:var(--accent);text-decoration:none;}
+.header a:hover{color:#fff;}
+.header h1{font-size:32px;font-weight:600;margin-top:16px;}
+.header p{font-size:15px;color:var(--text-dim);margin-top:8px;}
+
+.footer{margin-top:48px;padding-top:24px;border-top:1px solid var(--panel-border);font-family:var(--mono);font-size:12px;color:var(--text-muted);}
+.footer a{color:var(--accent);text-decoration:none;}
+.footer a:hover{color:#fff;}
+
+.skip-link{position:absolute;top:-40px;left:0;background:var(--accent,#64ffda);color:var(--bg,#0a0a0f);padding:10px 18px;z-index:1000;font-size:13px;font-weight:600;text-decoration:none;border-radius:0 0 6px 0;transition:top .2s}
+.skip-link:focus{top:0;outline:2px solid var(--accent,#64ffda);outline-offset:2px}

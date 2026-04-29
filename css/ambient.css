@@ -1,0 +1,136 @@
+/* Ambient layer: particle background + audio controls for all pages */
+:root {
+  --ambient-border:     rgba(255,255,255,0.05);
+  --ambient-accent-dim: rgba(0,229,160,0.06);
+}
+
+/* ── Canvas BG ── */
+#scene-bg {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── Audio toggle ── */
+#audio-toggle {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 500;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--ambient-border);
+  background: rgba(8,8,13,0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--text-muted, #4a4a5e);
+  transition: border-color 0.25s, color 0.25s, background 0.25s, opacity 0.25s;
+  opacity: 0.55;
+}
+#audio-toggle:hover,
+#audio-toggle:focus-visible {
+  border-color: var(--accent, #00e5a0);
+  color: var(--accent, #00e5a0);
+  background: var(--ambient-accent-dim);
+  opacity: 1;
+  outline: none;
+}
+#audio-toggle.muted { opacity: 0.3; }
+#audio-toggle.muted:hover,
+#audio-toggle.muted:focus-visible { opacity: 0.7; }
+#audio-toggle:not(.audio-unlocked) {
+  animation: audio-hint 3s ease-in-out infinite;
+}
+@keyframes audio-hint {
+  0%,100% { opacity: 0.55; }
+  50%      { opacity: 0.85; border-color: rgba(0,229,160,0.25); }
+}
+#audio-toggle svg { width: 16px; height: 16px; fill: currentColor; pointer-events: none; }
+#audio-toggle.audio-unlocked:not(.muted) {
+  animation: heartbeat 1.8s ease-in-out infinite;
+  opacity: 0.8;
+}
+#audio-toggle.audio-unlocked:not(.muted):hover,
+#audio-toggle.audio-unlocked:not(.muted):focus-visible {
+  opacity: 1;
+  animation-play-state: paused;
+}
+#audio-toggle.audio-unlocked:not(.muted)::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,229,160,0.55);
+  animation: pulse-ring 1.8s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes heartbeat {
+  0%,100% { transform: scale(1); }
+  6%       { transform: scale(1.09); }
+  16%      { transform: scale(1); }
+  24%      { transform: scale(1.05); }
+  38%      { transform: scale(1); }
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  80%  { transform: scale(1.9); opacity: 0; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+.audio-icon-off { display: none; }
+
+/* ── SFX toggle ── */
+#sfx-toggle {
+  position: fixed;
+  bottom: 70px;
+  right: 24px;
+  z-index: 500;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--ambient-border);
+  background: rgba(8,8,13,0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--text-muted, #4a4a5e);
+  transition: border-color 0.25s, color 0.25s, background 0.25s, opacity 0.25s;
+  opacity: 0.4;
+}
+#sfx-toggle:hover,
+#sfx-toggle:focus-visible {
+  border-color: var(--accent, #00e5a0);
+  color: var(--accent, #00e5a0);
+  background: var(--ambient-accent-dim);
+  opacity: 0.9;
+  outline: none;
+}
+#sfx-toggle.sfx-off { opacity: 0.25; }
+#sfx-toggle.sfx-off:hover,
+#sfx-toggle.sfx-off:focus-visible { opacity: 0.7; }
+#sfx-toggle svg { width: 15px; height: 15px; fill: currentColor; pointer-events: none; }
+
+/* ── Pixel burst animation ── */
+@keyframes btn-sfx-burst {
+  0%   { box-shadow: 0 0 0 0 rgba(0,229,160,0.35); }
+  60%  { box-shadow: 0 0 0 8px rgba(0,229,160,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,229,160,0); }
+}
+.btn-sfx-flash { animation: btn-sfx-burst 0.35s ease-out forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  #audio-toggle,
+  #audio-toggle::after,
+  #sfx-toggle { animation: none !important; }
+}
