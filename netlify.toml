@@ -27,7 +27,7 @@
 [[headers]]
   for = "/js/*"
   [headers.values]
-    Cache-Control = "public, max-age=86400, must-revalidate"
+    Cache-Control = "no-cache"
 
 [[headers]]
   for = "/audio/*"

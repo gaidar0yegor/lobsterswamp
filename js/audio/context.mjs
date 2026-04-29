@@ -100,6 +100,12 @@ async function unlockAudio({ continuation = false } = {}) {
 
   try {
     initSync();
+
+    // Chrome suspends AudioContext on tab hide and sometimes during power-save; auto-resume.
+    actx.onstatechange = () => {
+      if (isUnlocked && actx && actx.state === 'suspended') actx.resume().catch(() => {});
+    };
+
     if (actx.state !== 'running') await actx.resume();
     // iOS Safari can lag before reflecting state=running after resume() resolves;
     // wait one frame before checking so we don't bail out prematurely.
@@ -111,7 +117,7 @@ async function unlockAudio({ continuation = false } = {}) {
       isUnlocked = false;
       wasJustUnlocked = false;
       try { actx.close(); } catch {}
-      actx = null; masterGain = null; ambientGain = null;
+      actx = null; masterGain = null; ambientGain = null; sfxGain = null;
       return;
     }
 
@@ -126,6 +132,10 @@ async function unlockAudio({ continuation = false } = {}) {
     }
   } catch (err) {
     console.warn('[Audio] Context init failed:', err);
+    isUnlocked = false;
+    wasJustUnlocked = false;
+    try { if (actx) actx.close(); } catch {}
+    actx = null; masterGain = null; ambientGain = null; sfxGain = null;
   }
 }
 
