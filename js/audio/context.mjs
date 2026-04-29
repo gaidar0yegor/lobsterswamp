@@ -13,12 +13,6 @@
  *    - Respects prefers-reduced-motion (no cues when set)
  *    - Gracefully silent when /audio/ambient.mp3 is absent
  *
- *  Minecraft ambient aesthetic:
- *    - Cave reverb via synthetic convolver impulse response
- *    - Piano plucks in C minor pentatonic (C418-style note box)
- *    - Random ambient notes timed like Minecraft's music system
- *    - Note-block-style SFX click (G5 sine, 80ms)
- *
  *  Domain Events emitted:
  *    - AUDIO_UNLOCKED (first user interaction)
  *    - AUDIO_MUTED_CHANGED { muted: boolean }
@@ -32,46 +26,45 @@ import { Contexts } from '../shared/types.mjs';
 
 // ── Constants ───────────────────────────────────────────────
 const STORAGE_KEY   = 'yegor-audio-muted';
+const NAV_STATE_KEY = 'yegor-audio-nav';
 const AMBIENT_SRCS  = ['/audio/ambient.mp3', '/audio/ambient.ogg'];
-const AMBIENT_VOL   = 0.18;
-
-// C minor pentatonic across C3–C5 (C18-inspired note palette)
-const MC_PENTATONIC = [130.81, 155.56, 174.61, 196.00, 233.08,
-                       261.63, 311.13, 349.23, 392.00, 466.16, 523.25];
 
 const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+// iOS Safari cannot resume AudioContext outside user gestures; beforeunload is also unreliable on iOS.
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+const isMobile = isIOS || /Android/i.test(navigator.userAgent);
+// Mobile speakers need more headroom — 1.6× makes sequencer and ambient audible at mid system volume.
+const VOL_SCALE   = isMobile ? 1.6 : 1.0;
+const AMBIENT_VOL = 0.25 * VOL_SCALE;
+const CUE_VOL     = 0.10 * VOL_SCALE;  // section bell chime — clearly audible
+
+// ── Navigation continuity — detect cross-page navigation within 5s ──
+const _navState = (() => {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(NAV_STATE_KEY));
+    if (s && typeof s.savedAt === 'number' && Date.now() - s.savedAt < 5000) return s;
+    return null;
+  } catch { return null; }
+})();
+const isContinuation = _navState !== null;
 
 // ── State ───────────────────────────────────────────────────
 let actx             = null;
 let masterGain       = null;
 let ambientGain      = null;
-let caveReverb       = null;
-let reverbGain       = null;
+let sfxGain          = null;   // independent of ambient mute — SFX always audible when sfxEnabled
 let ambientSource    = null;
 let ambientBuffer    = null;
-let ambientPluckTimer = null;
 let isUnlocked       = false;
 let wasJustUnlocked  = false;
 let isMuted          = localStorage.getItem(STORAGE_KEY) === '1';
+let _seqTimer        = null;
 
-// ── Cave reverb ─────────────────────────────────────────────
-// Synthetic impulse response: random-noise with exponential decay.
-// Approximates the spacious, damp echo of a Minecraft cave.
-
-function buildCaveReverb() {
-  const convolver = actx.createConvolver();
-  const sr  = actx.sampleRate;
-  const len = Math.round(sr * 2.8);
-  const ir  = actx.createBuffer(2, len, sr);
-  for (let c = 0; c < 2; c++) {
-    const d = ir.getChannelData(c);
-    for (let i = 0; i < len; i++) {
-      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.4);
-    }
-  }
-  convolver.buffer = ir;
-  return convolver;
-}
+// ── Per-section bell cooldown (for re-scroll cues) ─────────
+const _sectionCooldowns = new Set();
 
 // ── AudioContext lifecycle ──────────────────────────────────
 
@@ -82,134 +75,391 @@ function initSync() {
   masterGain.gain.value = isMuted ? 0 : 1;
   masterGain.connect(actx.destination);
 
-  // Reverb chain: caveReverb → reverbGain → masterGain
-  caveReverb = buildCaveReverb();
-  reverbGain = actx.createGain();
-  reverbGain.gain.value = 0.35;
-  caveReverb.connect(reverbGain);
-  reverbGain.connect(masterGain);
-
-  // Ambient sits low in the mix; feeds both dry and reverb sends
   ambientGain = actx.createGain();
   ambientGain.gain.value = AMBIENT_VOL;
-  ambientGain.connect(masterGain);   // dry path
-  ambientGain.connect(caveReverb);   // wet path → cave echo
+  ambientGain.connect(masterGain);
+
+  // SFX routes directly to destination, bypassing masterGain mute
+  sfxGain = actx.createGain();
+  sfxGain.gain.value = 1.0;
+  sfxGain.connect(actx.destination);
+
+  // iOS Safari requires a real audio buffer scheduled synchronously within the user
+  // gesture to fully unlock the engine. resume() alone is not sufficient on iOS.
+  const silentBuf = actx.createBuffer(1, 1, actx.sampleRate);
+  const silentSrc = actx.createBufferSource();
+  silentSrc.buffer = silentBuf;
+  silentSrc.connect(actx.destination);
+  silentSrc.start(0);
 }
 
-async function unlockAudio() {
+async function unlockAudio({ continuation = false } = {}) {
   if (isUnlocked) return;
   isUnlocked = true;
-  wasJustUnlocked = true;
+  wasJustUnlocked = !continuation;
 
   try {
     initSync();
-    if (actx.state === 'suspended') await actx.resume();
+    if (actx.state !== 'running') await actx.resume();
+    // iOS Safari can lag before reflecting state=running after resume() resolves;
+    // wait one frame before checking so we don't bail out prematurely.
+    if (isIOS && actx.state !== 'running') {
+      await new Promise(r => setTimeout(r, 80));
+    }
+    if (actx.state !== 'running') {
+      // Autoplay still blocked — clean up and let the next user gesture retry
+      isUnlocked = false;
+      wasJustUnlocked = false;
+      try { actx.close(); } catch {}
+      actx = null; masterGain = null; ambientGain = null;
+      return;
+    }
 
     document.getElementById('audio-toggle')?.classList.add('audio-unlocked');
     bus.emit(DomainEvents.AUDIO_UNLOCKED);
 
-    loadAndStartAmbient();
-    if (!reduceMotion) scheduleAmbientPlucks();
+    const offset = continuation && _navState ? _navState.offset : 0;
+    loadAndStartAmbient(offset);
+    if (!isMuted) {
+      if (!continuation) playPageJingle();
+      startSequencer();
+    }
   } catch (err) {
     console.warn('[Audio] Context init failed:', err);
   }
 }
 
-async function loadAndStartAmbient() {
+async function loadAndStartAmbient(offset = 0) {
   for (const src of AMBIENT_SRCS) {
     try {
       const res = await fetch(src);
       if (!res.ok) continue;
       const buf = await res.arrayBuffer();
       ambientBuffer = await actx.decodeAudioData(buf);
-      startAmbient();
+      startAmbient(offset);
       return;
     } catch { /* try next format */ }
   }
-  // No file present — synthesized plucks still play
 }
 
-function startAmbient() {
+function startAmbient(offset = 0) {
   if (!ambientBuffer || ambientSource) return;
   ambientSource = actx.createBufferSource();
   ambientSource.buffer = ambientBuffer;
   ambientSource.loop = true;
   ambientSource.connect(ambientGain);
-  ambientSource.start(0);
+  ambientSource.start(0, offset % ambientBuffer.duration);
 }
 
-// ── Piano pluck (C418 style) ────────────────────────────────
-// Sine wave with fast piano attack, slow exponential decay.
-// Fully wet — routes only through caveReverb for maximum space.
-
-function playPianoPluck(freq, vol = 0.10) {
-  if (!actx || !caveReverb || isMuted) return;
-  const t = actx.currentTime;
-
-  const osc = actx.createOscillator();
-  const env = actx.createGain();
-  osc.type = 'sine';
-  osc.frequency.value = freq;
-
-  env.gain.setValueAtTime(0, t);
-  env.gain.linearRampToValueAtTime(vol, t + 0.008);          // 8ms attack
-  env.gain.exponentialRampToValueAtTime(vol * 0.28, t + 0.14); // decay
-  env.gain.exponentialRampToValueAtTime(0.001, t + 1.8);     // long release
-
-  osc.connect(env);
-  env.connect(caveReverb);
-  osc.start(t);
-  osc.stop(t + 1.8);
-}
-
-// ── Random ambient plucks ───────────────────────────────────
-// Mirrors Minecraft's music system: sparse, irregular notes that
-// feel like they come from the cave itself. 10–35s between notes.
-
-function scheduleAmbientPlucks() {
-  const delay = 10000 + Math.random() * 25000;
-  ambientPluckTimer = setTimeout(() => {
-    if (isUnlocked && !isMuted) {
-      const freq = MC_PENTATONIC[Math.floor(Math.random() * MC_PENTATONIC.length)];
-      playPianoPluck(freq, 0.05 + Math.random() * 0.04);
-    }
-    scheduleAmbientPlucks();
-  }, delay);
-}
-
-// ── Synthesized section cue ─────────────────────────────────
-// Random C minor pentatonic pluck — like a Minecraft note block
-// triggered by entering a new area.
+// ── Section cue — piano bell arpeggio ──────────────────────
+// Three staggered notes (C5-E5-G5) with harmonic overtones for bell texture.
 
 function playSectionCue() {
   if (!actx || isMuted || reduceMotion) return;
-  const freq = MC_PENTATONIC[3 + Math.floor(Math.random() * 5)]; // C4–Bb4 range
-  playPianoPluck(freq, 0.08);
+  const t = actx.currentTime;
+  const NOTES = [523.25, 659.25, 783.99]; // C5, E5, G5
+
+  NOTES.forEach((freq, i) => {
+    const nt = t + i * 0.13;
+
+    const osc = actx.createOscillator();
+    const env = actx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    osc.connect(env);
+    env.connect(masterGain);
+    env.gain.setValueAtTime(0, nt);
+    env.gain.linearRampToValueAtTime(CUE_VOL, nt + 0.006);
+    env.gain.exponentialRampToValueAtTime(0.001, nt + 0.9);
+    osc.start(nt);
+    osc.stop(nt + 0.9);
+
+    // 2nd harmonic for bell shimmer
+    const osc2 = actx.createOscillator();
+    const env2 = actx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 2;
+    osc2.connect(env2);
+    env2.connect(masterGain);
+    env2.gain.setValueAtTime(0, nt);
+    env2.gain.linearRampToValueAtTime(CUE_VOL * 0.28, nt + 0.006);
+    env2.gain.exponentialRampToValueAtTime(0.001, nt + 0.5);
+    osc2.start(nt);
+    osc2.stop(nt + 0.5);
+  });
+}
+
+// ── Page entry jingle — 5-note pentatonic ascending ────────
+// Plays once on first audio unlock. Quiet, like opening a Minecraft world.
+
+function playPageJingle() {
+  if (!actx || isMuted || reduceMotion) return;
+  const NOTES = [261.63, 329.63, 392, 440, 523.25]; // C4-E4-G4-A4-C5
+  const t = actx.currentTime + 0.08;
+
+  NOTES.forEach((freq, i) => {
+    const nt = t + i * 0.11;
+    const osc = actx.createOscillator();
+    const env = actx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    osc.connect(env);
+    env.connect(masterGain);
+    env.gain.setValueAtTime(0, nt);
+    env.gain.linearRampToValueAtTime(0.055, nt + 0.005);
+    env.gain.exponentialRampToValueAtTime(0.001, nt + 0.65);
+    osc.start(nt);
+    osc.stop(nt + 0.65);
+  });
+}
+
+// ── Multi-Song Sequencer ─────────────────────────────────────
+// Three melodic songs that rotate automatically:
+//   "Swamp"   — G major 80 BPM (signature swamp theme)
+//   "Nocturne"— A minor 70 BPM (melancholic, descending)
+//   "Ember"   — D major 90 BPM (bright, ascending)
+// Each song is 32 beats; a 2-beat rest separates consecutive songs.
+
+const SEQ_LOOKAHEAD = 0.15;
+const SEQ_TICK_MS   = 80;
+
+const SONGS = [
+  { // Swamp — G major, 80 BPM
+    bpm: 80,
+    melody: [
+      [7,1],[11,1],[14,1],[11,0.5],[9,0.5],
+      [7,2],[4,1],[7,1],
+      [9,1],[7,1],[4,1],[2,1],
+      [-5,4],
+      [14,1],[11,1],[9,2],
+      [9,1],[7,1],[11,1],[9,1],
+      [7,1.5],[4,0.5],[2,2],
+      [-5,2],[2,2],
+    ],
+    chords: [
+      [-17,-13,-10,-5,-1],
+      [-20,-13,-8,-5,-1],
+      [-24,-17,-12,-8,-5],
+      [-22,-15,-10,-6,-3],
+    ],
+    bass: [-17,-20,-24,-22],
+  },
+  { // Nocturne — A minor, 70 BPM
+    bpm: 70,
+    melody: [
+      [9,2],[12,1],[16,1],
+      [12,1],[9,1],[7,2],
+      [5,1],[7,1],[9,2],
+      [-3,4],
+      [16,1],[12,1],[9,1],[7,1],
+      [9,1],[12,1],[14,1],[12,1],
+      [9,1.5],[7,0.5],[5,2],
+      [-8,2],[2,2],
+    ],
+    chords: [
+      [-15,-8,-3,0,4],
+      [-19,-12,-7,-3,0],
+      [-24,-17,-12,-8,-5],
+      [-17,-10,-5,-1,2],
+    ],
+    bass: [-15,-19,-24,-17],
+  },
+  { // Ember — D major, 90 BPM
+    bpm: 90,
+    melody: [
+      [2,1],[6,1],[9,1],[11,1],
+      [14,2],[11,1],[9,1],
+      [6,1],[9,1],[11,1],[9,1],
+      [6,4],
+      [14,1],[13,1],[11,1],[9,1],
+      [11,2],[9,1],[11,1],
+      [14,1],[11,1],[9,1],[6,1],
+      [2,2],[-10,2],
+    ],
+    chords: [
+      [-22,-15,-10,-6,-3],
+      [-15,-8,-3,1,4],
+      [-13,-6,-1,2,6],
+      [-17,-10,-5,-1,2],
+    ],
+    bass: [-22,-15,-13,-17],
+  },
+];
+
+function _semToHz(n) { return 261.63 * Math.pow(2, n / 12); }
+
+function _seqPiano(freq, t, beats, beatS) {
+  if (!actx) return;
+  const dur = beats * beatS;
+  const V   = 0.072 * VOL_SCALE;
+  const atk = 0.006;
+
+  const o1 = actx.createOscillator(), e1 = actx.createGain();
+  o1.type = 'sine'; o1.frequency.value = freq;
+  o1.connect(e1); e1.connect(masterGain);
+  e1.gain.setValueAtTime(0, t);
+  e1.gain.linearRampToValueAtTime(V, t + atk);
+  e1.gain.exponentialRampToValueAtTime(V * 0.28, t + Math.min(dur * 0.55, 0.85));
+  e1.gain.exponentialRampToValueAtTime(0.0005, t + dur * 0.92);
+  o1.start(t); o1.stop(t + dur);
+
+  // 2nd harmonic — warmth / bell shimmer
+  const o2 = actx.createOscillator(), e2 = actx.createGain();
+  o2.type = 'triangle'; o2.frequency.value = freq * 2;
+  o2.connect(e2); e2.connect(masterGain);
+  e2.gain.setValueAtTime(0, t);
+  e2.gain.linearRampToValueAtTime(V * 0.13, t + atk);
+  e2.gain.exponentialRampToValueAtTime(0.0005, t + Math.min(dur * 0.35, 0.32));
+  o2.start(t); o2.stop(t + Math.min(dur * 0.35, 0.32) + 0.01);
+}
+
+function _seqPad(semitones, t, beatS) {
+  if (!actx) return;
+  const dur = beatS * 4;
+  const padV = 0.016 * VOL_SCALE;
+  semitones.forEach(n => {
+    const o = actx.createOscillator(), e = actx.createGain();
+    o.type = 'sine'; o.frequency.value = _semToHz(n);
+    o.connect(e); e.connect(masterGain);
+    e.gain.setValueAtTime(0, t);
+    e.gain.linearRampToValueAtTime(padV, t + 0.2);
+    e.gain.setValueAtTime(padV, t + dur - 0.4);
+    e.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+    o.start(t); o.stop(t + dur + 0.01);
+  });
+}
+
+function _seqBass(n, t) {
+  if (!actx) return;
+  const o = actx.createOscillator(), e = actx.createGain();
+  o.type = 'sine'; o.frequency.value = _semToHz(n);
+  o.connect(e); e.connect(masterGain);
+  e.gain.setValueAtTime(0, t);
+  e.gain.linearRampToValueAtTime(0.09 * VOL_SCALE, t + 0.010);
+  e.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+  o.start(t); o.stop(t + 0.56);
+}
+
+let _seqNoteIdx  = 0;
+let _seqNextT    = 0;
+let _seqBeats    = 0;
+let _seqLastBar  = -1;
+let _seqSongIdx  = 0;
+
+function startSequencer() {
+  if (_seqTimer !== null) return;
+  _seqNextT   = actx.currentTime + 0.5;
+  _seqBeats   = 0;
+  _seqNoteIdx = 0;
+  _seqLastBar = -1;
+  _seqSongIdx = 0;
+  _seqTick();
+}
+
+function stopSequencer() {
+  clearTimeout(_seqTimer);
+  _seqTimer = null;
+}
+
+function _seqTick() {
+  if (!actx || isMuted) { _seqTimer = null; return; }
+
+  const horizon = actx.currentTime + SEQ_LOOKAHEAD;
+  while (_seqNextT < horizon) {
+    const song  = SONGS[_seqSongIdx];
+    const beatS = 60 / song.bpm;
+    const [sem, beats] = song.melody[_seqNoteIdx];
+    const bar = Math.floor(_seqBeats / 4);
+
+    if (bar !== _seqLastBar) {
+      const ci = bar % song.chords.length;
+      _seqPad(song.chords[ci], _seqNextT, beatS);
+      _seqBass(song.bass[ci], _seqNextT);
+      _seqLastBar = bar;
+    }
+
+    _seqPiano(_semToHz(sem), _seqNextT, beats, beatS);
+    _seqNextT  += beats * beatS;
+    _seqBeats  += beats;
+    _seqNoteIdx++;
+
+    if (_seqNoteIdx >= song.melody.length) {
+      _seqNextT  += beatS * 2;
+      _seqSongIdx = (_seqSongIdx + 1) % SONGS.length;
+      _seqNoteIdx = 0;
+      _seqBeats   = 0;
+      _seqLastBar = -1;
+    }
+  }
+
+  _seqTimer = setTimeout(_seqTick, SEQ_TICK_MS);
 }
 
 // ── SFX — Button click sounds ───────────────────────────────
-// G5 sine pluck — mimics Minecraft's harp note block.
-// ON by default; user can toggle off via #sfx-toggle.
+// Minecraft-style "pop": short pitched oscillator + high-frequency noise bite.
+// Routed through masterGain so mute is respected.
 
 const SFX_KEY  = 'yegor-sfx';
 let sfxEnabled = localStorage.getItem(SFX_KEY) !== '0';
 
 function playSFXClick() {
   if (!actx || !sfxEnabled) return;
-  const t = actx.currentTime;
+  const t  = actx.currentTime;
 
+  // Pitched pop (square → drops in pitch quickly)
+  const osc = actx.createOscillator();
+  const env = actx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(880, t);
+  osc.frequency.exponentialRampToValueAtTime(440, t + 0.03);
+  osc.connect(env);
+  env.connect(sfxGain);  // bypasses masterGain mute
+  env.gain.setValueAtTime(0, t);
+  env.gain.linearRampToValueAtTime(0.18, t + 0.003);
+  env.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+  osc.start(t);
+  osc.stop(t + 0.09);
+
+  // Noise bite for "click" texture
+  const sr  = actx.sampleRate;
+  const n   = Math.ceil(sr * 0.012);
+  const buf = actx.createBuffer(1, n, sr);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+
+  const nSrc = actx.createBufferSource();
+  nSrc.buffer = buf;
+  const hp  = actx.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 3500;
+  const nEnv = actx.createGain();
+  nEnv.gain.setValueAtTime(0.09, t);
+  nEnv.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
+  nSrc.connect(hp); hp.connect(nEnv); nEnv.connect(sfxGain);  // bypasses masterGain mute
+  nSrc.start(t);
+}
+
+// ── SFX — Link/button hover ─────────────────────────────────
+// Very soft high ting — like Minecraft UI selection highlight.
+
+let _lastHoverMs = 0;
+function playHoverSound() {
+  if (!actx || !sfxEnabled) return;
+  const now = Date.now();
+  if (now - _lastHoverMs < 80) return; // throttle rapid hover chains
+  _lastHoverMs = now;
+
+  const t   = actx.currentTime;
   const osc = actx.createOscillator();
   const env = actx.createGain();
   osc.type = 'sine';
-  osc.frequency.value = 783.99; // G5 — Minecraft harp note block
-
-  env.gain.setValueAtTime(0.18, t);
-  env.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-
+  osc.frequency.value = 1320;
   osc.connect(env);
-  env.connect(actx.destination);
+  env.connect(sfxGain);  // bypasses masterGain mute
+  env.gain.setValueAtTime(0, t);
+  env.gain.linearRampToValueAtTime(0.038, t + 0.003);
+  env.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
   osc.start(t);
-  osc.stop(t + 0.08);
+  osc.stop(t + 0.12);
 }
 
 function setSFX(on) {
@@ -246,11 +496,10 @@ function setMuted(val) {
     masterGain.gain.setTargetAtTime(val ? 0 : 1, t, 0.25);
   }
 
-  if (val && ambientPluckTimer) {
-    clearTimeout(ambientPluckTimer);
-    ambientPluckTimer = null;
-  } else if (!val && isUnlocked && !ambientPluckTimer && !reduceMotion) {
-    scheduleAmbientPlucks();
+  if (val) {
+    stopSequencer();
+  } else if (isUnlocked) {
+    startSequencer();
   }
 
   updateToggleUI();
@@ -279,18 +528,67 @@ function updateToggleUI() {
   btn.querySelector('.audio-icon-off').style.display = isMuted ? 'block' : '';
 }
 
+// ── Navigation state persistence ────────────────────────────
+
+function saveNavState() {
+  if (!isUnlocked) return;
+  const offset = (ambientBuffer && actx)
+    ? actx.currentTime % ambientBuffer.duration
+    : 0;
+  try {
+    sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      offset,
+    }));
+  } catch {}
+}
+
 // ── Boot ────────────────────────────────────────────────────
 
 export async function boot() {
+  // Save playback position when navigating away so the next page can resume.
+  // pagehide is used alongside beforeunload because iOS Safari doesn't fire beforeunload reliably.
+  window.addEventListener('beforeunload', saveNavState);
+  window.addEventListener('pagehide', saveNavState);
+
+  // Resume AudioContext when tab comes back into focus (browsers may suspend it).
+  // iOS Safari blocks actx.resume() outside a user gesture — hook the next touchstart instead.
+  document.addEventListener('visibilitychange', () => {
+    if (!isUnlocked || !actx || document.hidden || actx.state !== 'suspended') return;
+    if (isIOS) {
+      document.addEventListener('touchstart', () => actx.resume().catch(() => {}),
+        { passive: true, once: true });
+    } else {
+      actx.resume().catch(() => {});
+    }
+  });
+
   const GATE_EVENTS = ['click', 'touchstart', 'keydown'];
   const onFirstInteraction = () => {
-    unlockAudio();
-    GATE_EVENTS.forEach(ev => document.removeEventListener(ev, onFirstInteraction));
+    unlockAudio({ continuation: isContinuation }).then(() => {
+      if (isUnlocked) {
+        GATE_EVENTS.forEach(ev => document.removeEventListener(ev, onFirstInteraction));
+      }
+      // If unlock failed (isUnlocked still false), listeners stay registered for retry
+    });
   };
   GATE_EVENTS.forEach(ev =>
     document.addEventListener(ev, onFirstInteraction, { passive: true })
   );
 
+  // If navigating from another page in this session, try auto-resume immediately.
+  // Chrome preserves sticky user activation across same-origin navigations, so
+  // AudioContext.resume() may succeed without requiring a new user gesture.
+  // Skip on iOS — auto-resume without a gesture is never allowed there.
+  if (isContinuation && !isIOS) {
+    setTimeout(() => {
+      if (!isUnlocked) {
+        unlockAudio({ continuation: true }).catch(() => {});
+      }
+    }, 50);
+  }
+
+  // Ambient mute toggle
   document.addEventListener('click', e => {
     if (e.target.closest('#audio-toggle')) {
       if (wasJustUnlocked) {
@@ -302,10 +600,12 @@ export async function boot() {
     }
   });
 
+  // SFX toggle
   document.addEventListener('click', e => {
     if (e.target.closest('#sfx-toggle')) setSFX(!sfxEnabled);
   });
 
+  // SFX + pixel burst on every button/chip click
   document.addEventListener('click', e => {
     const target = e.target.closest('button, .ai-prompt-chip, [role="button"]');
     if (!target) return;
@@ -314,8 +614,25 @@ export async function boot() {
     addPixelBurst(target);
   }, { passive: true });
 
+  // Hover sound on interactive elements
+  document.addEventListener('mouseover', e => {
+    if (!isUnlocked) return;
+    const target = e.target.closest('a, button, .ai-prompt-chip, [role="button"]');
+    if (!target || target.closest('#audio-toggle, #sfx-toggle')) return;
+    playHoverSound();
+  }, { passive: true });
+
+  // Section reveal → bell arpeggio cue (first-time reveal)
   bus.on(DomainEvents.SECTION_REVEALED, () => {
     if (isUnlocked) playSectionCue();
+  });
+
+  // Section scrolled → bell cue on every scroll-through (2.5s cooldown per section)
+  bus.on(DomainEvents.SECTION_SCROLLED, ({ section }) => {
+    if (!isUnlocked || _sectionCooldowns.has(section)) return;
+    _sectionCooldowns.add(section);
+    setTimeout(() => _sectionCooldowns.delete(section), 2500);
+    playSectionCue();
   });
 
   updateToggleUI();
