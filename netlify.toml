@@ -2,6 +2,16 @@
   publish = "."
   command = ""
 
+[[redirects]]
+  from = "/lobster-swamp"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/lobster-swamp/*"
+  to = "/"
+  status = 301
+
 [[headers]]
   for = "/*"
   [headers.values]
