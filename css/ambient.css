@@ -134,3 +134,49 @@
   #audio-toggle::after,
   #sfx-toggle { animation: none !important; }
 }
+
+/* ── Theme / song indicator ── */
+#theme-indicator {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-muted, #4a4a5e);
+  background: rgba(8,8,13,0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--ambient-border);
+  border-radius: 20px;
+  padding: 6px 13px;
+  cursor: pointer;
+  user-select: none;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.45s, transform 0.45s, border-color 0.3s, color 0.3s;
+}
+#theme-indicator.visible {
+  opacity: 0.5;
+  transform: translateY(0);
+}
+#theme-indicator:hover,
+#theme-indicator:focus-visible {
+  opacity: 1;
+  border-color: var(--accent, #00e5a0);
+  color: var(--text-dim, #7a7a8e);
+  outline: none;
+}
+.theme-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent, #00e5a0);
+  flex-shrink: 0;
+  transition: background 0.6s;
+}

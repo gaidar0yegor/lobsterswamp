@@ -22,3 +22,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:
 
 .skip-link{position:absolute;top:-40px;left:0;background:var(--accent,#64ffda);color:var(--bg,#0a0a0f);padding:10px 18px;z-index:1000;font-size:13px;font-weight:600;text-decoration:none;border-radius:0 0 6px 0;transition:top .2s}
 .skip-link:focus{top:0;outline:2px solid var(--accent,#64ffda);outline-offset:2px}
+
+/* ── Visual themes — swapped via JS on song change ── */
+body.theme-nocturne{--accent:#a78bfa;--accent2:#c4b5fd;--glow:rgba(167,139,250,0.15);}
+body.theme-ember   {--accent:#fb923c;--accent2:#fbbf24;--glow:rgba(251,146,60,0.15);}
+body.theme-dawn    {--accent:#38bdf8;--accent2:#7dd3fc;--glow:rgba(56,189,248,0.15);}
+body.theme-abyss   {--accent:#f472b6;--accent2:#e879f9;--glow:rgba(244,114,182,0.15);}

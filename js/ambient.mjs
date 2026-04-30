@@ -4,10 +4,15 @@
  * Keeps the full DDD event bus so audio/context.mjs works unchanged.
  */
 
-import { boot as bootAudio } from './audio/context.mjs';
-import { createScene }       from './shared/three-adapter.mjs';
+import { boot as bootAudio, skipSong } from './audio/context.mjs';
+import { createScene }                 from './shared/three-adapter.mjs';
+import { bus, DomainEvents }           from './shared/event-bus.mjs';
 
 const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+// Base hue for particle/line color — updated on each theme change
+let _themeHue = 0.47;
+const THEME_HUES = { swamp: 0.47, nocturne: 0.75, ember: 0.07, dawn: 0.55, abyss: 0.88 };
 
 async function initParticles() {
   if (reduceMotion) return;
@@ -204,8 +209,8 @@ async function initParticles() {
     camera.position.z  = 60 - scrollProgress * 20;
     points.rotation.y  = time * 0.06;
 
-    // Color shift on scroll
-    const hue = 0.47 + scrollProgress * 0.15;
+    // Color shift on scroll, anchored to current theme hue
+    const hue = _themeHue + scrollProgress * 0.08;
     mat.color.setHSL(hue, 0.6, 0.55);
     lineMat.color.setHSL(hue, 0.6, 0.55);
   });
@@ -215,6 +220,23 @@ async function initParticles() {
 
 async function boot() {
   await bootAudio();
+
+  // Theme change: swap body class + particle hue + indicator label
+  bus.on(DomainEvents.THEME_CHANGED, ({ theme, name }) => {
+    _themeHue = THEME_HUES[theme] ?? 0.47;
+    document.body.className = document.body.className.replace(/\btheme-\S+/g, '').trim();
+    if (theme !== 'swamp') document.body.classList.add(`theme-${theme}`);
+    const ind = document.getElementById('theme-indicator');
+    if (ind) {
+      ind.querySelector('.theme-name').textContent = name;
+      ind.classList.add('visible');
+    }
+  });
+
+  // Indicator click → skip to next song
+  document.getElementById('theme-indicator')
+    ?.addEventListener('click', skipSong);
+
   initParticles().catch(err => console.warn('[Ambient] Particles failed:', err));
 }
 

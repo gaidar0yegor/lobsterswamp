@@ -224,18 +224,19 @@ function playPageJingle() {
 }
 
 // ── Multi-Song Sequencer ─────────────────────────────────────
-// Three melodic songs that rotate automatically:
-//   "Swamp"   — G major 80 BPM (signature swamp theme)
-//   "Nocturne"— A minor 70 BPM (melancholic, descending)
-//   "Ember"   — D major 90 BPM (bright, ascending)
-// Each song is 32 beats; a 2-beat rest separates consecutive songs.
+// Five melodic songs that rotate automatically, each paired with a visual theme:
+//   "Swamp"   — G major 80 BPM  (cyan,    signature)
+//   "Nocturne"— A minor 70 BPM  (purple,  melancholic)
+//   "Ember"   — D major 90 BPM  (amber,   bright)
+//   "Dawn"    — E major 75 BPM  (sky,     hopeful ascending)
+//   "Abyss"   — F# minor 62 BPM (magenta, deep haunting)
+// Each song is 32 beats; a short rest separates consecutive songs.
 
 const SEQ_LOOKAHEAD = 0.15;
 const SEQ_TICK_MS   = 80;
 
 const SONGS = [
-  { // Swamp — G major, 80 BPM
-    bpm: 80,
+  { name: 'Swamp', theme: 'swamp', bpm: 80,
     melody: [
       [7,1],[11,1],[14,1],[11,0.5],[9,0.5],
       [7,2],[4,1],[7,1],
@@ -254,8 +255,7 @@ const SONGS = [
     ],
     bass: [-17,-20,-24,-22],
   },
-  { // Nocturne — A minor, 70 BPM
-    bpm: 70,
+  { name: 'Nocturne', theme: 'nocturne', bpm: 70,
     melody: [
       [9,2],[12,1],[16,1],
       [12,1],[9,1],[7,2],
@@ -274,8 +274,7 @@ const SONGS = [
     ],
     bass: [-15,-19,-24,-17],
   },
-  { // Ember — D major, 90 BPM
-    bpm: 90,
+  { name: 'Ember', theme: 'ember', bpm: 90,
     melody: [
       [2,1],[6,1],[9,1],[11,1],
       [14,2],[11,1],[9,1],
@@ -293,6 +292,44 @@ const SONGS = [
       [-17,-10,-5,-1,2],
     ],
     bass: [-22,-15,-13,-17],
+  },
+  { name: 'Dawn', theme: 'dawn', bpm: 75,
+    melody: [
+      [4,1],[8,1],[11,1],[13,1],
+      [16,2],[13,1],[11,1],
+      [8,1],[11,1],[13,1],[16,1],
+      [11,4],
+      [4,1],[6,1],[8,2],
+      [11,1],[9,1],[8,1],[4,1],
+      [6,2],[4,1.5],[1,0.5],
+      [-8,2],[4,2],
+    ],
+    chords: [
+      [-20,-16,-13,-8,-4],
+      [-15,-11,-8,-3,1],
+      [-13,-9,-6,-1,3],
+      [-23,-16,-11,-4,1],
+    ],
+    bass: [-20,-15,-13,-23],
+  },
+  { name: 'Abyss', theme: 'abyss', bpm: 62,
+    melody: [
+      [18,2],[16,1],[14,1],
+      [13,2],[11,2],
+      [9,1],[8,1],[6,2],
+      [-6,4],
+      [13,1.5],[11,0.5],[9,2],
+      [8,1],[6,1],[8,1],[9,1],
+      [13,2],[11,2],
+      [6,2],[1,2],
+    ],
+    chords: [
+      [-18,-15,-11,-6,-3],
+      [-13,-10,-6,-1,2],
+      [-15,-11,-8,-3,1],
+      [-20,-16,-13,-8,-4],
+    ],
+    bass: [-18,-13,-15,-20],
   },
 ];
 
@@ -376,6 +413,7 @@ function startSequencer() {
   _seqSongIdx         = 0;
   _seqBeatsSinceStart = 0;
   _seqSongBeats       = SONGS[0].melody.reduce((s, [, b]) => s + b, 0);
+  bus.emit(DomainEvents.THEME_CHANGED, { theme: SONGS[0].theme, name: SONGS[0].name });
   _seqTick();
 }
 
@@ -416,6 +454,7 @@ function _seqTick() {
       _seqLastBar = -1;
       _seqBeatsSinceStart = 0;
       _seqSongBeats = SONGS[_seqSongIdx].melody.reduce((s, [, b]) => s + b, 0);
+      bus.emit(DomainEvents.THEME_CHANGED, { theme: SONGS[_seqSongIdx].theme, name: SONGS[_seqSongIdx].name });
     }
   }
 
@@ -666,4 +705,12 @@ export async function boot() {
   updateSFXUI();
 
   bus.emit(DomainEvents.CONTEXT_LOADED, { context: Contexts.AUDIO });
+}
+
+// ── Song skip ────────────────────────────────────────────────
+// Force-advance to the next song on the next sequencer tick.
+
+export function skipSong() {
+  if (!_seqTimer) return;
+  _seqNoteIdx = SONGS[_seqSongIdx]?.melody.length ?? 0;
 }
