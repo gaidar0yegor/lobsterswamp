@@ -122,6 +122,7 @@ async function unlockAudio({ continuation = false } = {}) {
     }
 
     document.getElementById('audio-toggle')?.classList.add('audio-unlocked');
+    document.getElementById('audio-hint')?.classList.add('audio-hint-hidden');
     bus.emit(DomainEvents.AUDIO_UNLOCKED);
 
     const offset = continuation && _navState ? _navState.offset : 0;
