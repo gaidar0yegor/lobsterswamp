@@ -716,7 +716,7 @@ const SFX_KEY  = 'yegor-sfx';
 let sfxEnabled = localStorage.getItem(SFX_KEY) !== '0';
 
 function playSFXClick() {
-  if (!actx || !sfxEnabled) return;
+  if (!actx || !sfxEnabled || isMuted) return;
   const t  = actx.currentTime;
 
   // Pitched pop (square → drops in pitch quickly)
@@ -756,7 +756,7 @@ function playSFXClick() {
 
 let _lastHoverMs = 0;
 function playHoverSound() {
-  if (!actx || !sfxEnabled) return;
+  if (!actx || !sfxEnabled || isMuted) return;
   const now = Date.now();
   if (now - _lastHoverMs < 80) return; // throttle rapid hover chains
   _lastHoverMs = now;
