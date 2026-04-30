@@ -4,7 +4,8 @@
  * ═══════════════════════════════════════════════════════════════
  *
  *  Owns: ambient background music, scroll-triggered section cues,
- *        mute/unmute toggle (localStorage-persisted).
+ *        mute/unmute toggle (localStorage-persisted),
+ *        per-song visual theme changes.
  *
  *  Design constraints:
  *    - Self-hosted audio only (CSP: media-src 'self')
@@ -16,6 +17,7 @@
  *  Domain Events emitted:
  *    - AUDIO_UNLOCKED (first user interaction)
  *    - AUDIO_MUTED_CHANGED { muted: boolean }
+ *    - THEME_CHANGED { theme: string, name: string }
  *
  *  Domain Events consumed:
  *    - SECTION_REVEALED { section } → plays section enter cue
@@ -29,6 +31,40 @@ const STORAGE_KEY   = 'yegor-audio-muted';
 const NAV_STATE_KEY = 'yegor-audio-nav';
 const AMBIENT_SRCS  = ['/audio/ambient.mp3', '/audio/ambient.ogg'];
 
+// ── Self-inject audio controls when not present in page HTML ─
+// Pages can omit the button markup; boot() will create it.
+function injectControlsIfNeeded() {
+  if (!document.getElementById('audio-toggle')) {
+    const btn = document.createElement('button');
+    btn.id = 'audio-toggle';
+    btn.setAttribute('aria-label', 'Enable ambient audio');
+    btn.setAttribute('title', 'Enable audio');
+    btn.innerHTML =
+      '<svg class="audio-icon-on" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+        '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02z' +
+        'M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>' +
+      '</svg>' +
+      '<svg class="audio-icon-off" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+        '<path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 ' +
+        '2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71z' +
+        'M4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25A6.916 6.916 0 0 1 14 18.98v2.06A9.01 9.01 0 0 0 ' +
+        '17.54 19l2.19 2.19L21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>' +
+      '</svg>';
+    document.body.appendChild(btn);
+  }
+  if (!document.getElementById('sfx-toggle')) {
+    const btn = document.createElement('button');
+    btn.id = 'sfx-toggle';
+    btn.setAttribute('aria-label', 'Disable click sounds');
+    btn.setAttribute('title', 'Click sounds: ON');
+    btn.innerHTML =
+      '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+        '<path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6zm-2 16a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>' +
+      '</svg>';
+    document.body.appendChild(btn);
+  }
+}
+
 const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 // iOS Safari cannot resume AudioContext outside user gestures; beforeunload is also unreliable on iOS.
@@ -39,13 +75,14 @@ const isMobile = isIOS || /Android/i.test(navigator.userAgent);
 // Mobile speakers need more headroom — 1.6× makes sequencer and ambient audible at mid system volume.
 const VOL_SCALE   = isMobile ? 1.6 : 1.0;
 const AMBIENT_VOL = 0.25 * VOL_SCALE;
-const CUE_VOL     = 0.10 * VOL_SCALE;  // section bell chime — clearly audible
+const CUE_VOL     = 0.04 * VOL_SCALE;  // section bell chime — subtle scroll cue
 
-// ── Navigation continuity — detect cross-page navigation within 5s ──
+// ── Navigation continuity — detect cross-page navigation within same session ──
+// 30-minute window: any page-to-page navigation in a typical session is a continuation.
 const _navState = (() => {
   try {
     const s = JSON.parse(sessionStorage.getItem(NAV_STATE_KEY));
-    if (s && typeof s.savedAt === 'number' && Date.now() - s.savedAt < 5000) return s;
+    if (s && typeof s.savedAt === 'number' && Date.now() - s.savedAt < 1800000) return s;
     return null;
   } catch { return null; }
 })();
@@ -62,6 +99,7 @@ let isUnlocked       = false;
 let wasJustUnlocked  = false;
 let isMuted          = localStorage.getItem(STORAGE_KEY) === '1';
 let _seqTimer        = null;
+let _seqSuspendRetries = 0;
 
 // ── Per-section bell cooldown (for re-scroll cues) ─────────
 const _sectionCooldowns = new Set();
@@ -100,12 +138,6 @@ async function unlockAudio({ continuation = false } = {}) {
 
   try {
     initSync();
-
-    // Chrome suspends AudioContext on tab hide and sometimes during power-save; auto-resume.
-    actx.onstatechange = () => {
-      if (isUnlocked && actx && actx.state === 'suspended') actx.resume().catch(() => {});
-    };
-
     if (actx.state !== 'running') await actx.resume();
     // iOS Safari can lag before reflecting state=running after resume() resolves;
     // wait one frame before checking so we don't bail out prematurely.
@@ -121,44 +153,62 @@ async function unlockAudio({ continuation = false } = {}) {
       return;
     }
 
+    // Auto-resume if the browser suspends the context after we set it up
+    // (Chrome's autoplay policy can suspend async after resume() resolves).
+    actx.onstatechange = () => {
+      if (!actx || isMuted || isIOS) return;
+      if (actx.state === 'suspended') {
+        actx.resume().catch(() => {});
+      } else if (actx.state === 'running' && _seqTimer === null) {
+        // Context auto-resumed (tab regained focus) — restart sequencer if stopped.
+        startSequencer();
+      }
+    };
+
     document.getElementById('audio-toggle')?.classList.add('audio-unlocked');
     document.getElementById('audio-hint')?.classList.add('audio-hint-hidden');
     bus.emit(DomainEvents.AUDIO_UNLOCKED);
 
     const offset = continuation && _navState ? _navState.offset : 0;
-    loadAndStartAmbient(offset);
+    loadAndStartAmbient(offset, continuation);
     if (!isMuted) {
       if (!continuation) playPageJingle();
-      startSequencer();
+      startSequencer(continuation ? _navState : null);
     }
   } catch (err) {
     console.warn('[Audio] Context init failed:', err);
+    // Reset so the next user gesture or backoff attempt can retry
     isUnlocked = false;
     wasJustUnlocked = false;
-    try { if (actx) actx.close(); } catch {}
+    try { actx?.close(); } catch {}
     actx = null; masterGain = null; ambientGain = null; sfxGain = null;
   }
 }
 
-async function loadAndStartAmbient(offset = 0) {
+async function loadAndStartAmbient(offset = 0, continuation = false) {
   for (const src of AMBIENT_SRCS) {
     try {
       const res = await fetch(src);
       if (!res.ok) continue;
       const buf = await res.arrayBuffer();
       ambientBuffer = await actx.decodeAudioData(buf);
-      startAmbient(offset);
+      startAmbient(offset, continuation);
       return;
     } catch { /* try next format */ }
   }
 }
 
-function startAmbient(offset = 0) {
+function startAmbient(offset = 0, continuation = false) {
   if (!ambientBuffer || ambientSource) return;
   ambientSource = actx.createBufferSource();
   ambientSource.buffer = ambientBuffer;
   ambientSource.loop = true;
   ambientSource.connect(ambientGain);
+  // Fade in gently on continuation to avoid abrupt audio pop on page transition
+  if (continuation) {
+    ambientGain.gain.setValueAtTime(0, actx.currentTime);
+    ambientGain.gain.linearRampToValueAtTime(AMBIENT_VOL, actx.currentTime + 0.6);
+  }
   ambientSource.start(0, offset % ambientBuffer.duration);
 }
 
@@ -336,6 +386,8 @@ const SONGS = [
 
 function _semToHz(n) { return 261.63 * Math.pow(2, n / 12); }
 
+// Crossfade multiplier — smoothly fades notes in at song start and out at song end.
+// FADE_IN_BEATS and FADE_OUT_BEATS set the ramp length; value is always [0.05, 1].
 const FADE_IN_BEATS  = 6;
 const FADE_OUT_BEATS = 8;
 function _mixFade() {
@@ -348,7 +400,7 @@ function _mixFade() {
 function _seqPiano(freq, t, beats, beatS, fade = 1) {
   if (!actx) return;
   const dur = beats * beatS;
-  const V   = 0.072 * VOL_SCALE * fade;
+  const V   = (0.072 + (Math.random() * 0.012 - 0.006)) * VOL_SCALE * fade;
   const atk = 0.006;
 
   const o1 = actx.createOscillator(), e1 = actx.createGain();
@@ -397,34 +449,111 @@ function _seqBass(n, t, fade = 1) {
   o.start(t); o.stop(t + 0.56);
 }
 
-let _seqNoteIdx         = 0;
-let _seqNextT           = 0;
-let _seqBeats           = 0;
-let _seqLastBar         = -1;
-let _seqSongIdx         = 0;
-let _seqBeatsSinceStart = 0;
-let _seqSongBeats       = 0;
+let _seqNoteIdx        = 0;
+let _seqNextT          = 0;
+let _seqBeats          = 0;
+let _seqLastBar        = -1;
+let _seqSongIdx        = 0;
+let _seqPlaylist       = [];
+let _seqBeatsSinceStart = 0;  // beats elapsed in current song (for crossfade)
+let _seqSongBeats       = 0;  // total beats in current song (for crossfade)
 
-function startSequencer() {
+// Returns next song index, never repeating the current song back-to-back.
+// Shuffles the remaining songs each time the playlist is exhausted.
+function _nextSongIdx(currentIdx) {
+  if (_seqPlaylist.length === 0) {
+    const indices = SONGS.map((_, i) => i).filter(i => i !== currentIdx);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    _seqPlaylist = indices;
+  }
+  return _seqPlaylist.shift();
+}
+
+function startSequencer(nav = null) {
   if (_seqTimer !== null) return;
-  _seqNextT           = actx.currentTime + 0.5;
-  _seqBeats           = 0;
-  _seqNoteIdx         = 0;
-  _seqLastBar         = -1;
-  _seqSongIdx         = 0;
-  _seqBeatsSinceStart = 0;
-  _seqSongBeats       = SONGS[0].melody.reduce((s, [, b]) => s + b, 0);
-  bus.emit(DomainEvents.THEME_CHANGED, { theme: SONGS[0].theme, name: SONGS[0].name });
+  if (nav && typeof nav.seqSongIdx === 'number') {
+    // Continuation: restore saved song position.
+    // Resume guard: reject positions with < 8 beats remaining to avoid
+    // "1–2 notes then 60s silence" — worse UX than starting the song fresh.
+    _seqNextT   = actx.currentTime + 0.15;
+    _seqSongIdx = nav.seqSongIdx % SONGS.length;
+    const song     = SONGS[_seqSongIdx];
+    const sameSong = (nav.seqSongIdx % SONGS.length) === _seqSongIdx;
+    let resumeIdx = (sameSong && typeof nav.seqNoteIdx === 'number') ? nav.seqNoteIdx : 0;
+    if (resumeIdx >= song.melody.length) {
+      resumeIdx = 0;
+    } else if (resumeIdx > 0) {
+      let beatsUsed = 0;
+      for (let i = 0; i < resumeIdx; i++) beatsUsed += song.melody[i][1];
+      const totalBeats = song.melody.reduce((s, [, b]) => s + b, 0);
+      if (totalBeats - beatsUsed < 8) resumeIdx = 0;
+    }
+    _seqNoteIdx = resumeIdx;
+    if (resumeIdx === 0) {
+      _seqBeats          = 0;
+      _seqLastBar        = -1;
+      _seqBeatsSinceStart = 0;
+    } else {
+      _seqBeats          = (sameSong && typeof nav.seqBeats   === 'number') ? nav.seqBeats   : 0;
+      _seqLastBar        = (sameSong && typeof nav.seqLastBar === 'number') ? nav.seqLastBar : -1;
+      _seqBeatsSinceStart = (sameSong && typeof nav.seqBeatsSinceStart === 'number') ? nav.seqBeatsSinceStart : 0;
+    }
+    _seqSongBeats = SONGS[_seqSongIdx].melody.reduce((s, [, b]) => s + b, 0);
+  } else {
+    // Fresh start: always begin with Swamp (song 0)
+    _seqNextT    = actx.currentTime + 0.5;
+    _seqSongIdx  = 0;
+    _seqNoteIdx  = 0;
+    _seqBeats    = 0;
+    _seqLastBar  = -1;
+    _seqPlaylist = [];
+    _seqBeatsSinceStart = 0;
+    _seqSongBeats = SONGS[0].melody.reduce((s, [, b]) => s + b, 0);
+  }
+  bus.emit(DomainEvents.THEME_CHANGED, { theme: SONGS[_seqSongIdx].theme, name: SONGS[_seqSongIdx].name });
   _seqTick();
 }
 
 function stopSequencer() {
   clearTimeout(_seqTimer);
   _seqTimer = null;
+  _seqSuspendRetries = 0;
 }
 
 function _seqTick() {
   if (!actx || isMuted) { _seqTimer = null; return; }
+
+  // Don't schedule into a suspended context — currentTime is frozen, which
+  // would cause a burst of notes all at once when the context eventually resumes.
+  if (actx.state === 'suspended') {
+    if (++_seqSuspendRetries >= 30) {
+      // Context stuck suspended for ~9.6s — stop sequencer but keep context alive.
+      // onstatechange or visibilitychange will restart when the tab regains focus.
+      _seqSuspendRetries = 0;
+      _seqTimer = null;
+      return;
+    }
+    actx.resume().catch(() => {});
+    _seqTimer = setTimeout(_seqTick, SEQ_TICK_MS * 4);
+    return;
+  }
+  _seqSuspendRetries = 0;
+
+  // After suspension recovery, resync if scheduled position drifted far behind current
+  // time (e.g. actx.currentTime jumped after a long context pause in some browsers).
+  if (_seqNextT < actx.currentTime - 2) {
+    _seqNextT          = actx.currentTime + 0.1;
+    _seqSongIdx        = 0;
+    _seqNoteIdx        = 0;
+    _seqBeats          = 0;
+    _seqLastBar        = -1;
+    _seqBeatsSinceStart = 0;
+    _seqSongBeats      = SONGS[0].melody.reduce((s, [, b]) => s + b, 0);
+    bus.emit(DomainEvents.THEME_CHANGED, { theme: SONGS[0].theme, name: SONGS[0].name });
+  }
 
   const horizon = actx.currentTime + SEQ_LOOKAHEAD;
   while (_seqNextT < horizon) {
@@ -448,8 +577,12 @@ function _seqTick() {
     _seqNoteIdx++;
 
     if (_seqNoteIdx >= song.melody.length) {
+      // Short breath between songs — 0.3–0.6s, enough for a natural pause
+      // without the long silence that made it feel like the music froze.
+      // Songs fade out over their final FADE_OUT_BEATS and fade in over the
+      // first FADE_IN_BEATS, so the transition sounds like a smooth DJ mix.
       _seqNextT  += 0.3 + Math.random() * 0.3;
-      _seqSongIdx = (_seqSongIdx + 1) % SONGS.length;
+      _seqSongIdx = _nextSongIdx(_seqSongIdx);
       _seqNoteIdx = 0;
       _seqBeats   = 0;
       _seqLastBar = -1;
@@ -459,12 +592,15 @@ function _seqTick() {
     }
   }
 
-  _seqTimer = setTimeout(_seqTick, SEQ_TICK_MS);
+  // Poll slowly during silence (saves CPU), fast when actively scheduling.
+  const ahead = _seqNextT - actx.currentTime;
+  const tickMs = ahead > 10 ? 2000 : SEQ_TICK_MS;
+  _seqTimer = setTimeout(_seqTick, tickMs);
 }
 
 // ── SFX — Button click sounds ───────────────────────────────
 // Minecraft-style "pop": short pitched oscillator + high-frequency noise bite.
-// Routed through masterGain so mute is respected.
+// Routed through sfxGain so ambient mute does not silence click feedback.
 
 const SFX_KEY  = 'yegor-sfx';
 let sfxEnabled = localStorage.getItem(SFX_KEY) !== '0';
@@ -606,6 +742,11 @@ function saveNavState() {
     sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify({
       savedAt: Date.now(),
       offset,
+      seqSongIdx:         _seqSongIdx,
+      seqNoteIdx:         _seqNoteIdx,
+      seqBeats:           _seqBeats,
+      seqLastBar:         _seqLastBar,
+      seqBeatsSinceStart: _seqBeatsSinceStart,
     }));
   } catch {}
 }
@@ -613,6 +754,9 @@ function saveNavState() {
 // ── Boot ────────────────────────────────────────────────────
 
 export async function boot() {
+  // Inject audio controls into the DOM if the page HTML doesn't include them.
+  injectControlsIfNeeded();
+
   // Save playback position when navigating away so the next page can resume.
   // pagehide is used alongside beforeunload because iOS Safari doesn't fire beforeunload reliably.
   window.addEventListener('beforeunload', saveNavState);
@@ -622,11 +766,17 @@ export async function boot() {
   // iOS Safari blocks actx.resume() outside a user gesture — hook the next touchstart instead.
   document.addEventListener('visibilitychange', () => {
     if (!isUnlocked || !actx || document.hidden || actx.state !== 'suspended') return;
+    const doResume = () => {
+      actx.resume().then(() => {
+        if (!isMuted && _seqTimer === null && actx && actx.state === 'running') {
+          startSequencer();
+        }
+      }).catch(() => {});
+    };
     if (isIOS) {
-      document.addEventListener('touchstart', () => actx.resume().catch(() => {}),
-        { passive: true, once: true });
+      document.addEventListener('touchstart', doResume, { passive: true, once: true });
     } else {
-      actx.resume().catch(() => {});
+      doResume();
     }
   });
 
@@ -643,16 +793,31 @@ export async function boot() {
     document.addEventListener(ev, onFirstInteraction, { passive: true })
   );
 
-  // If navigating from another page in this session, try auto-resume immediately.
-  // Chrome preserves sticky user activation across same-origin navigations, so
-  // AudioContext.resume() may succeed without requiring a new user gesture.
-  // Skip on iOS — auto-resume without a gesture is never allowed there.
-  if (isContinuation && !isIOS) {
-    setTimeout(() => {
-      if (!isUnlocked) {
-        unlockAudio({ continuation: true }).catch(() => {});
+  // Continuation: user navigated from a page where audio was already active.
+  // Chrome's sticky user activation can transfer across same-origin navigations,
+  // but the window is short and page load (parsing, CDN scripts, module eval)
+  // adds latency. Retry with backoff so slow-loading pages still catch the
+  // activation window — attempts at 0, 100, 350, 800, 2000ms.
+  if (isContinuation && !isMuted && !isIOS) {
+    const resumeWithBackoff = async () => {
+      for (const delay of [0, 100, 350, 800, 2000]) {
+        if (isUnlocked) break;
+        if (delay > 0) await new Promise(r => setTimeout(r, delay));
+        await unlockAudio({ continuation: true }).catch(() => {});
       }
-    }, 50);
+    };
+    resumeWithBackoff();
+  } else if (!isIOS && !isMuted) {
+    // Non-continuation: backoff attempts — Chrome may allow autoplay after DOMContentLoaded
+    // settles and the media engagement index is checked (can take a few hundred ms).
+    const tryAutoStart = async () => {
+      for (const delay of [0, 200, 700, 2000]) {
+        if (isUnlocked) break;
+        if (delay > 0) await new Promise(r => setTimeout(r, delay));
+        await unlockAudio({ continuation: false }).catch(() => {});
+      }
+    };
+    tryAutoStart();
   }
 
   // Ambient mute toggle
