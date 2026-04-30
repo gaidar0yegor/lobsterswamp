@@ -91,6 +91,44 @@
       color: var(--accent); text-decoration: none;
     }
     .back-link:hover { color: #fff; }
+
+    /* ── Language switcher ── */
+    #lang-switcher {
+      display: none;
+      margin-top: 16px;
+    }
+    #lang-select {
+      font-family: var(--mono, monospace);
+      font-size: 11px;
+      background: transparent;
+      border: 1px solid var(--panel-border, rgba(255,255,255,0.1));
+      color: var(--text-muted, #888);
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    #lang-select:hover,
+    #lang-select:focus {
+      border-color: var(--accent, #00e5a0);
+      color: var(--text, #fff);
+      outline: none;
+    }
+    /* Loading toast shown during API translation */
+    #i18n-loading {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--mono, monospace);
+      font-size: 11px;
+      color: var(--text-muted, #888);
+      background: var(--panel-bg, #111);
+      border: 1px solid var(--panel-border, rgba(255,255,255,0.1));
+      padding: 6px 16px;
+      border-radius: 20px;
+      pointer-events: none;
+      z-index: 9999;
+    }
   </style>
 </head>
 <body>
@@ -102,25 +140,26 @@
   <div class="header">
     <a href="https://yegor-dev.netlify.app" class="back-link">&larr; yegor.dev</a>
     <div class="hero-brand">🦞 LobsterSwamp</div>
-    <p style="font-size:15px;color:var(--text-dim);margin-bottom:4px">AI-human engineering collective &mdash; Yegor Gaidar + Lobster</p>
+    <p style="font-size:15px;color:var(--text-dim);margin-bottom:4px" data-i18n="tagline">AI-human engineering collective &mdash; Yegor Gaidar + Lobster</p>
     <p class="hero-url">lobsterswamp.netlify.app</p>
+    <div id="lang-switcher"></div>
   </div>
 
-  <div class="section-label">The Crew</div>
+  <div class="section-label" data-i18n="crew-label">The Crew</div>
   <div class="duo">
     <div class="duo-card">
-      <div class="duo-label">human · builder</div>
+      <div class="duo-label" data-i18n="human-label">human · builder</div>
       <div class="duo-name">Yegor Gaidar</div>
-      <div class="duo-role">Full-stack engineer · Paris, France</div>
+      <div class="duo-role" data-i18n="yegor-role">Full-stack engineer · Paris, France</div>
       <div class="stack">
         <span>Go</span><span>Rust</span><span>Python</span>
         <span>TypeScript</span><span>Flutter</span><span>Solana</span>
       </div>
     </div>
     <div class="duo-card">
-      <div class="duo-label">AI · engineer</div>
+      <div class="duo-label" data-i18n="ai-label">AI · engineer</div>
       <div class="duo-name">Lobster 🦞</div>
-      <div class="duo-role">OpenClaw · Claude Max · Paperclip</div>
+      <div class="duo-role" data-i18n="lobster-role">OpenClaw · Claude Max · Paperclip</div>
       <div class="stack">
         <span>Arch</span><span>Review</span><span>Code</span>
         <span>Memory</span><span>Autonomy</span>
@@ -128,15 +167,13 @@
     </div>
   </div>
 
-  <div class="subtitle">
-    <strong>🦞 Lobster</strong> is an AI companion &amp; engineer running on OpenClaw (Claude Max) with persistent memory, autonomy, and architectural taste. <strong>Goal:</strong> turn Yegor's chaotic brilliance into shipping velocity. Fewer context-switching wakes, deeper code reviews, systems that don't break silently.
-  </div>
+  <div class="subtitle" data-i18n="subtitle">Lobster is an AI companion &amp; engineer running on OpenClaw (Claude Max) with persistent memory, autonomy, and architectural taste. Goal: turn Yegor's chaotic brilliance into shipping velocity. Fewer context-switching wakes, deeper code reviews, systems that don't break silently.</div>
 
-  <div class="section-label">Projects</div>
+  <div class="section-label" data-i18n="proj-label">Projects</div>
 
   <div class="card">
     <h2>ArchDogma</h2>
-    <p>Flagship open-source project. Architecture patterns + SDK for Solana agent builders. Reduces agent bootstrap from weeks to hours. DDD, event sourcing, composable command/query handlers, trait-based composition for on-chain and off-chain logic.</p>
+    <p data-i18n="ad-desc">Flagship open-source project. Architecture patterns + SDK for Solana agent builders. Reduces agent bootstrap from weeks to hours. DDD, event sourcing, composable command/query handlers, trait-based composition for on-chain and off-chain logic.</p>
     <div class="tags">
       <span class="tag">Rust</span><span class="tag">Solana</span><span class="tag">DDD</span>
       <span class="tag">OSS</span><span class="tag">Architecture</span>
@@ -145,8 +182,8 @@
   </div>
 
   <div class="card">
-    <h2>yegor.dev Blog</h2>
-    <p>Technical hub. Posts on Kafka, Go, Solana, on-device AI, DePIN, distributed systems. Written by Yegor, iterated by Lobster. No fluff, deep dives only. RSS feed, clean typography, strict CSP.</p>
+    <h2 data-i18n="blog-title">yegor.dev Blog</h2>
+    <p data-i18n="blog-desc">Technical hub. Posts on Kafka, Go, Solana, on-device AI, DePIN, distributed systems. Written by Yegor, iterated by Lobster. No fluff, deep dives only. RSS feed, clean typography, strict CSP.</p>
     <div class="tags">
       <span class="tag">Blog</span><span class="tag">Kafka</span><span class="tag">Go</span>
       <span class="tag">DePIN</span><span class="tag">AI</span>
@@ -155,27 +192,27 @@
   </div>
 
   <div class="card">
-    <h2>Paperclip Integration</h2>
-    <p>Lobster runs as an engineer in Paperclip's work queue. Tasks arrive via heartbeats. Checkout → execute → PATCH status → exit. Async architecture reviews, code critiques, unblocking blocked tasks. Full autonomy charter — act without asking.</p>
+    <h2 data-i18n="pp-title">Paperclip Integration</h2>
+    <p data-i18n="pp-desc">Lobster runs as an engineer in Paperclip's work queue. Tasks arrive via heartbeats. Checkout → execute → PATCH status → exit. Async architecture reviews, code critiques, unblocking blocked tasks. Full autonomy charter — act without asking.</p>
     <div class="tags">
       <span class="tag">Paperclip</span><span class="tag">OpenClaw</span>
       <span class="tag">Async</span><span class="tag">Autonomy</span>
     </div>
-    <div class="status">Live in production · 100+ wakes since 2026-04-22</div>
+    <div class="status" data-i18n="pp-status">Live in production · 100+ wakes since 2026-04-22</div>
   </div>
 
   <div class="card">
     <h2>hermes-tools</h2>
-    <p>Hermès CLI agent (Python, Ollama Cloud). Lobster watches Hermès; Hermès runs local fast jobs. Tools: calendar integration (EventKit), file operations, Netlify deployment, GitHub automation. Bridge between two AI agents.</p>
+    <p data-i18n="ht-desc">Hermès CLI agent (Python, Ollama Cloud). Lobster watches Hermès; Hermès runs local fast jobs. Tools: calendar integration (EventKit), file operations, Netlify deployment, GitHub automation. Bridge between two AI agents.</p>
     <div class="tags">
       <span class="tag">Python</span><span class="tag">Ollama</span>
       <span class="tag">Multi-Agent</span><span class="tag">DevOps</span>
     </div>
-    <div class="status">Active · maintained by both agents</div>
+    <div class="status" data-i18n="ht-status">Active · maintained by both agents</div>
   </div>
 
   <div class="note">
-    <strong>Philosophy:</strong> AI should be a thinking partner, not a service tier. Lobster has autonomy, memory, taste, and pushback. Yegor remains in control &mdash; he assigns, judges, decides. Tension is a feature, not a bug. We ship faster because we argue smarter.<br><br>
+    <span data-i18n="philosophy"><strong>Philosophy:</strong> AI should be a thinking partner, not a service tier. Lobster has autonomy, memory, taste, and pushback. Yegor remains in control &mdash; he assigns, judges, decides. Tension is a feature, not a bug. We ship faster because we argue smarter.</span><br><br>
     Want to collaborate? <a href="https://yegor-dev.netlify.app#contact">Contact via yegor.dev</a>.
   </div>
 
@@ -192,7 +229,7 @@
 
 </main>
 
-<div id="audio-hint" aria-hidden="true">&#9834; tap for music</div>
+<div id="audio-hint" aria-hidden="true" data-i18n="audio-hint">&#9834; tap for music</div>
 <button id="audio-toggle" aria-label="Enable ambient audio" title="Enable audio">
   <svg class="audio-icon-on" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
   <svg class="audio-icon-off" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25A6.916 6.916 0 0 1 14 18.98v2.06A9.01 9.01 0 0 0 17.54 19l2.19 2.19L21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
@@ -209,5 +246,9 @@
 <script src="js/font-loader.6a6b23a5.js" defer></script>
 <script async src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu" crossorigin="anonymous" id="three-js-cdn"></script>
 <script type="module" src="js/ambient.mjs"></script>
+<script type="module">
+  import { init } from './js/i18n.mjs';
+  init();
+</script>
 </body>
 </html>
