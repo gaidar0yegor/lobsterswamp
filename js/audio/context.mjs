@@ -298,10 +298,19 @@ const SONGS = [
 
 function _semToHz(n) { return 261.63 * Math.pow(2, n / 12); }
 
-function _seqPiano(freq, t, beats, beatS) {
+const FADE_IN_BEATS  = 6;
+const FADE_OUT_BEATS = 8;
+function _mixFade() {
+  const fadeIn  = Math.min(1, _seqBeatsSinceStart / FADE_IN_BEATS);
+  const beatsLeft = _seqSongBeats - _seqBeatsSinceStart;
+  const fadeOut = Math.min(1, beatsLeft / FADE_OUT_BEATS);
+  return Math.max(0.05, Math.min(fadeIn, fadeOut));
+}
+
+function _seqPiano(freq, t, beats, beatS, fade = 1) {
   if (!actx) return;
   const dur = beats * beatS;
-  const V   = 0.072 * VOL_SCALE;
+  const V   = 0.072 * VOL_SCALE * fade;
   const atk = 0.006;
 
   const o1 = actx.createOscillator(), e1 = actx.createGain();
@@ -323,10 +332,10 @@ function _seqPiano(freq, t, beats, beatS) {
   o2.start(t); o2.stop(t + Math.min(dur * 0.35, 0.32) + 0.01);
 }
 
-function _seqPad(semitones, t, beatS) {
+function _seqPad(semitones, t, beatS, fade = 1) {
   if (!actx) return;
   const dur = beatS * 4;
-  const padV = 0.016 * VOL_SCALE;
+  const padV = 0.016 * VOL_SCALE * fade;
   semitones.forEach(n => {
     const o = actx.createOscillator(), e = actx.createGain();
     o.type = 'sine'; o.frequency.value = _semToHz(n);
@@ -339,30 +348,34 @@ function _seqPad(semitones, t, beatS) {
   });
 }
 
-function _seqBass(n, t) {
+function _seqBass(n, t, fade = 1) {
   if (!actx) return;
   const o = actx.createOscillator(), e = actx.createGain();
   o.type = 'sine'; o.frequency.value = _semToHz(n);
   o.connect(e); e.connect(masterGain);
   e.gain.setValueAtTime(0, t);
-  e.gain.linearRampToValueAtTime(0.09 * VOL_SCALE, t + 0.010);
+  e.gain.linearRampToValueAtTime(0.09 * VOL_SCALE * fade, t + 0.010);
   e.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
   o.start(t); o.stop(t + 0.56);
 }
 
-let _seqNoteIdx  = 0;
-let _seqNextT    = 0;
-let _seqBeats    = 0;
-let _seqLastBar  = -1;
-let _seqSongIdx  = 0;
+let _seqNoteIdx         = 0;
+let _seqNextT           = 0;
+let _seqBeats           = 0;
+let _seqLastBar         = -1;
+let _seqSongIdx         = 0;
+let _seqBeatsSinceStart = 0;
+let _seqSongBeats       = 0;
 
 function startSequencer() {
   if (_seqTimer !== null) return;
-  _seqNextT   = actx.currentTime + 0.5;
-  _seqBeats   = 0;
-  _seqNoteIdx = 0;
-  _seqLastBar = -1;
-  _seqSongIdx = 0;
+  _seqNextT           = actx.currentTime + 0.5;
+  _seqBeats           = 0;
+  _seqNoteIdx         = 0;
+  _seqLastBar         = -1;
+  _seqSongIdx         = 0;
+  _seqBeatsSinceStart = 0;
+  _seqSongBeats       = SONGS[0].melody.reduce((s, [, b]) => s + b, 0);
   _seqTick();
 }
 
@@ -380,25 +393,29 @@ function _seqTick() {
     const beatS = 60 / song.bpm;
     const [sem, beats] = song.melody[_seqNoteIdx];
     const bar = Math.floor(_seqBeats / 4);
+    const fade = _mixFade();
 
     if (bar !== _seqLastBar) {
       const ci = bar % song.chords.length;
-      _seqPad(song.chords[ci], _seqNextT, beatS);
-      _seqBass(song.bass[ci], _seqNextT);
+      _seqPad(song.chords[ci], _seqNextT, beatS, fade);
+      _seqBass(song.bass[ci], _seqNextT, fade);
       _seqLastBar = bar;
     }
 
-    _seqPiano(_semToHz(sem), _seqNextT, beats, beatS);
-    _seqNextT  += beats * beatS;
-    _seqBeats  += beats;
+    _seqPiano(_semToHz(sem), _seqNextT, beats, beatS, fade);
+    _seqNextT          += beats * beatS;
+    _seqBeats          += beats;
+    _seqBeatsSinceStart += beats;
     _seqNoteIdx++;
 
     if (_seqNoteIdx >= song.melody.length) {
-      _seqNextT  += beatS * 2;
+      _seqNextT  += 0.3 + Math.random() * 0.3;
       _seqSongIdx = (_seqSongIdx + 1) % SONGS.length;
       _seqNoteIdx = 0;
       _seqBeats   = 0;
       _seqLastBar = -1;
+      _seqBeatsSinceStart = 0;
+      _seqSongBeats = SONGS[_seqSongIdx].melody.reduce((s, [, b]) => s + b, 0);
     }
   }
 
