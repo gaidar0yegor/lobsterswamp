@@ -211,3 +211,10 @@
   flex-shrink: 0;
   transition: background 0.6s;
 }
+
+/* ── 2:59 AM wager theme — crimson accent ── */
+body.theme-wager .theme-dot { background: #c0392b; }
+body.theme-wager #theme-indicator:hover,
+body.theme-wager #theme-indicator:focus-visible { border-color: #c0392b; }
+body.theme-wager #audio-toggle:hover,
+body.theme-wager #audio-toggle:focus-visible { border-color: #c0392b; color: #c0392b; background: rgba(192,57,43,0.08); }

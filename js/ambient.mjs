@@ -12,7 +12,7 @@ const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').mat
 
 // Base hue for particle/line color — updated on each theme change
 let _themeHue = 0.47;
-const THEME_HUES = { swamp: 0.47, nocturne: 0.75, ember: 0.07, dawn: 0.55, abyss: 0.88 };
+const THEME_HUES = { swamp: 0.47, nocturne: 0.75, ember: 0.07, dawn: 0.55, abyss: 0.88, wager: 0.0 };
 
 async function initParticles() {
   if (reduceMotion) return;

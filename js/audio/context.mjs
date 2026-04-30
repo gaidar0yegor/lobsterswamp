@@ -290,6 +290,21 @@ const SEQ_TICK_MS    = 80;
 const SONG_GAP_MIN_S = 15;  // seconds of silence between songs (Minecraft-style)
 const SONG_GAP_MAX_S = 35;
 
+// ── 2:59 AM Wager mode ──────────────────────────────────────
+// At 2:59 AM local time, the sequencer locks to the Soul Wager theme
+// for 30 minutes, then returns to normal rotation.
+const WAGER_SONG_IDX = 5;   // index in SONGS (appended below)
+const WAGER_START_H  = 2;
+const WAGER_START_M  = 59;
+const WAGER_DURATION = 30;  // minutes
+
+function isWagerTime() {
+  const now = new Date();
+  const total = now.getHours() * 60 + now.getMinutes();
+  const start = WAGER_START_H * 60 + WAGER_START_M;
+  return total >= start && total < start + WAGER_DURATION;
+}
+
 const SONGS = [
   { name: 'Swamp', theme: 'swamp', bpm: 80,
     melody: [
@@ -493,6 +508,55 @@ const SONGS = [
     ],
     bass: [-18,-13,-15,-20],
   },
+  // ── 2:59 AM: Soul Wager ─────────────────────────────────────────────────────
+  // Victorian Gothic / high-stakes noir. D minor, 68 BPM.
+  // Mirrors: driving staccato tension, mournful violin protagonist,
+  // deep brass devil, semitone crawl, waltz-like trap — per the Doplefy analysis.
+  { name: '2:59', theme: 'wager', bpm: 68,
+    melody: [
+      // The man with the top hat — sparse arrival
+      [null,4],
+      [2,2],[null,2],
+      [null,4],
+      [5,2],[null,2],
+      // Iron Rabbits — staccato heartbeat begins
+      [2,1],[null,1],[2,1],[null,1],
+      [5,1],[7,1],[9,1],[null,1],
+      [10,3],[null,1],
+      [9,2],[null,2],
+      // In the Table — waltz trap
+      [null,4],
+      [2,1],[5,1],[2,1],[5,1],
+      [9,4],
+      [7,1],[5,1],[null,2],
+      // No trades — semitone crawl, no escape
+      [5,1],[4,1],[2,1],[null,1],
+      [-3,4],
+      [null,4],
+      // The last Card — pressure peaks
+      [9,1],[10,1],[12,1],[null,1],
+      [14,4],
+      [12,1],[10,1],[9,1],[null,1],
+      [null,4],
+      // The devil is evil — supernatural reckoning
+      [9,1],[null,1],[5,1],[null,1],
+      [-3,4],
+      [1,1],[2,1],[null,2],
+      [null,4],
+      // For Samuel — grim resolution
+      [5,2],[2,2],
+      [2,4],
+      [null,4],
+      [null,4],
+    ],
+    chords: [
+      [-22,-19,-15,-10,-7],   // Dm: D-F-A spread
+      [-15,-12,-8,-3,0],      // Am: A-C-E spread
+      [-14,-10,-7,-2,2],      // Bb: Bb-D-F spread
+      [-17,-14,-10,-5,-2],    // Gm: G-Bb-D spread
+    ],
+    bass: [-22,-15,-14,-17],
+  },
 ];
 
 function _semToHz(n) { return 261.63 * Math.pow(2, n / 12); }
@@ -571,9 +635,12 @@ let _seqSongBeats       = 0;  // total beats in current song (for crossfade)
 
 // Returns next song index, never repeating the current song back-to-back.
 // Shuffles the remaining songs each time the playlist is exhausted.
+// During 2:59–3:29 AM, always returns WAGER_SONG_IDX.
 function _nextSongIdx(currentIdx) {
+  if (isWagerTime()) return WAGER_SONG_IDX;
+  const normalCount = SONGS.length - 1; // exclude wager song from normal rotation
   if (_seqPlaylist.length === 0) {
-    const indices = SONGS.map((_, i) => i).filter(i => i !== currentIdx);
+    const indices = Array.from({ length: normalCount }, (_, i) => i).filter(i => i !== currentIdx);
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
@@ -614,15 +681,16 @@ function startSequencer(nav = null) {
     }
     _seqSongBeats = SONGS[_seqSongIdx].melody.reduce((s, [, b]) => s + b, 0);
   } else {
-    // Fresh start: always begin with Swamp (song 0)
+    // Fresh start: boot into wager song at 2:59 AM, else always begin with Swamp
+    const startIdx = isWagerTime() ? WAGER_SONG_IDX : 0;
     _seqNextT    = actx.currentTime + 0.5;
-    _seqSongIdx  = 0;
+    _seqSongIdx  = startIdx;
     _seqNoteIdx  = 0;
     _seqBeats    = 0;
     _seqLastBar  = -1;
     _seqPlaylist = [];
     _seqBeatsSinceStart = 0;
-    _seqSongBeats = SONGS[0].melody.reduce((s, [, b]) => s + b, 0);
+    _seqSongBeats = SONGS[startIdx].melody.reduce((s, [, b]) => s + b, 0);
   }
   bus.emit(DomainEvents.THEME_CHANGED, { theme: SONGS[_seqSongIdx].theme, name: SONGS[_seqSongIdx].name });
   _seqTick();
@@ -979,6 +1047,20 @@ export async function boot() {
 
   updateToggleUI();
   updateSFXUI();
+
+  // Periodic wager transition: if the page stays open, switch into/out of
+  // the 2:59 AM mode at the right moment without requiring a page reload.
+  setInterval(() => {
+    if (!isUnlocked || isMuted || !_seqTimer) return;
+    const inWager  = isWagerTime();
+    const currWager = _seqSongIdx === WAGER_SONG_IDX;
+    if (inWager && !currWager) {
+      // 2:59 AM just hit — skip to end of current song so next pick is wager
+      _seqNoteIdx = SONGS[_seqSongIdx]?.melody.length ?? 0;
+    }
+    // Exit is automatic: when wager song ends after 3:29 AM, _nextSongIdx
+    // returns a normal song because isWagerTime() will be false.
+  }, 30_000); // check every 30 s
 
   bus.emit(DomainEvents.CONTEXT_LOADED, { context: Contexts.AUDIO });
 }
