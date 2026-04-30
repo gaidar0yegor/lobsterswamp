@@ -275,28 +275,54 @@ function playPageJingle() {
 }
 
 // ── Multi-Song Sequencer ─────────────────────────────────────
-// Five melodic songs that rotate automatically, each paired with a visual theme:
-//   "Swamp"   — G major 80 BPM  (cyan,    signature)
-//   "Nocturne"— A minor 70 BPM  (purple,  melancholic)
-//   "Ember"   — D major 90 BPM  (amber,   bright)
-//   "Dawn"    — E major 75 BPM  (sky,     hopeful ascending)
-//   "Abyss"   — F# minor 62 BPM (magenta, deep haunting)
-// Each song is 32 beats; a short rest separates consecutive songs.
+// Five melodic songs that rotate automatically, each paired with a visual theme.
+// Minecraft-style: each song is 96 beats (64–93 s depending on BPM), with sparse
+// melodies and rests that breathe. null semitone = rest (pads/bass still play).
+// Between songs: SONG_GAP_MIN_S–SONG_GAP_MAX_S seconds of silence.
+//   "Swamp"    — G major  80 BPM  (cyan,    signature,   72 s)
+//   "Nocturne" — A minor  70 BPM  (purple,  melancholic, 82 s)
+//   "Ember"    — D major  90 BPM  (amber,   bright,      64 s)
+//   "Dawn"     — E major  75 BPM  (sky,     hopeful,     77 s)
+//   "Abyss"    — F# minor 62 BPM  (magenta, haunting,    93 s)
 
-const SEQ_LOOKAHEAD = 0.15;
-const SEQ_TICK_MS   = 80;
+const SEQ_LOOKAHEAD  = 0.15;
+const SEQ_TICK_MS    = 80;
+const SONG_GAP_MIN_S = 15;  // seconds of silence between songs (Minecraft-style)
+const SONG_GAP_MAX_S = 35;
 
 const SONGS = [
   { name: 'Swamp', theme: 'swamp', bpm: 80,
     melody: [
-      [7,1],[11,1],[14,1],[11,0.5],[9,0.5],
-      [7,2],[4,1],[7,1],
-      [9,1],[7,1],[4,1],[2,1],
+      // Intro — open silence, single notes breathe
+      [null,4],
+      [7,2],[null,2],
+      [11,1],[null,3],
+      [14,2],[11,1],[null,1],
+      // First phrase
+      [9,2],[null,2],
+      [7,3],[null,1],
+      [4,1],[7,1],[null,2],
+      [null,4],
+      // Low bridge
       [-5,4],
+      [null,4],
+      [2,2],[4,2],
+      [null,4],
+      // Development
+      [7,1],[11,1],[14,1],[null,1],
+      [14,2],[11,2],
+      [9,1],[null,1],[7,1],[null,1],
+      [null,4],
+      // Build — E5 peak
+      [11,1],[14,1],[16,2],
       [14,1],[11,1],[9,2],
-      [9,1],[7,1],[11,1],[9,1],
       [7,1.5],[4,0.5],[2,2],
-      [-5,2],[2,2],
+      [null,4],
+      // Resolution
+      [7,2],[null,2],
+      [-5,4],
+      [null,4],
+      [11,2],[null,2],
     ],
     chords: [
       [-17,-13,-10,-5,-1],
@@ -308,14 +334,36 @@ const SONGS = [
   },
   { name: 'Nocturne', theme: 'nocturne', bpm: 70,
     melody: [
-      [9,2],[12,1],[16,1],
+      // Intro
+      [null,4],
+      [9,2],[null,2],
+      [12,2],[null,2],
+      [null,4],
+      // First phrase
+      [9,1],[12,1],[16,2],
       [12,1],[9,1],[7,2],
-      [5,1],[7,1],[9,2],
+      [null,4],
+      [5,2],[null,2],
+      // Low bridge
       [-3,4],
-      [16,1],[12,1],[9,1],[7,1],
-      [9,1],[12,1],[14,1],[12,1],
-      [9,1.5],[7,0.5],[5,2],
-      [-8,2],[2,2],
+      [null,4],
+      [2,1],[5,1],[null,2],
+      [null,4],
+      // Development
+      [9,1],[null,1],[12,1],[null,1],
+      [16,2],[null,2],
+      [12,1],[9,1],[7,2],
+      [null,4],
+      // Build — D5 peak
+      [5,2],[7,2],
+      [9,1],[12,1],[14,2],
+      [12,2],[9,2],
+      [null,4],
+      // Resolution
+      [9,2],[null,2],
+      [-3,4],
+      [null,4],
+      [7,2],[null,2],
     ],
     chords: [
       [-15,-8,-3,0,4],
@@ -327,14 +375,36 @@ const SONGS = [
   },
   { name: 'Ember', theme: 'ember', bpm: 90,
     melody: [
-      [2,1],[6,1],[9,1],[11,1],
+      // Intro
+      [null,2],[2,2],
+      [6,1],[null,3],
+      [9,2],[null,2],
+      [null,4],
+      // First phrase — D major arpeggio
+      [2,1],[6,1],[9,2],
+      [11,2],[9,1],[null,1],
+      [6,1],[null,1],[9,1],[null,1],
+      [null,4],
+      // Low
+      [-10,4],
+      [null,4],
+      [2,2],[4,2],
+      [null,4],
+      // Development
+      [9,1],[11,1],[14,1],[null,1],
+      [13,2],[11,2],
+      [9,1],[null,1],[6,1],[null,1],
+      [null,4],
+      // Build
+      [6,1],[9,1],[11,2],
       [14,2],[11,1],[9,1],
-      [6,1],[9,1],[11,1],[9,1],
-      [6,4],
-      [14,1],[13,1],[11,1],[9,1],
-      [11,2],[9,1],[11,1],
-      [14,1],[11,1],[9,1],[6,1],
-      [2,2],[-10,2],
+      [6,1.5],[4,0.5],[2,2],
+      [null,4],
+      // Resolution
+      [9,2],[null,2],
+      [2,4],
+      [null,4],
+      [6,2],[null,2],
     ],
     chords: [
       [-22,-15,-10,-6,-3],
@@ -346,14 +416,36 @@ const SONGS = [
   },
   { name: 'Dawn', theme: 'dawn', bpm: 75,
     melody: [
-      [4,1],[8,1],[11,1],[13,1],
-      [16,2],[13,1],[11,1],
-      [8,1],[11,1],[13,1],[16,1],
-      [11,4],
-      [4,1],[6,1],[8,2],
-      [11,1],[9,1],[8,1],[4,1],
-      [6,2],[4,1.5],[1,0.5],
-      [-8,2],[4,2],
+      // Intro — hopeful
+      [null,4],
+      [4,2],[null,2],
+      [8,1],[null,3],
+      [11,2],[8,1],[null,1],
+      // First phrase
+      [13,2],[11,1],[null,1],
+      [8,3],[null,1],
+      [4,1],[6,1],[null,2],
+      [null,4],
+      // Low
+      [-8,4],
+      [null,4],
+      [-1,2],[4,2],
+      [null,4],
+      // Development
+      [4,1],[8,1],[11,1],[null,1],
+      [13,2],[16,2],
+      [13,1],[11,1],[8,2],
+      [null,4],
+      // Build — E5 peak
+      [11,1],[13,1],[16,2],
+      [16,1],[13,1],[11,2],
+      [8,1.5],[6,0.5],[4,2],
+      [null,4],
+      // Resolution
+      [11,2],[null,2],
+      [-8,4],
+      [null,4],
+      [4,2],[null,2],
     ],
     chords: [
       [-20,-16,-13,-8,-4],
@@ -365,14 +457,33 @@ const SONGS = [
   },
   { name: 'Abyss', theme: 'abyss', bpm: 62,
     melody: [
-      [18,2],[16,1],[14,1],
-      [13,2],[11,2],
-      [9,1],[8,1],[6,2],
+      // Intro — deep silence then sudden F#5 peak
+      [null,4],[null,2],[18,2],
+      [16,2],[null,4],[null,2],
+      // Descend
+      [13,2],[null,2],
+      [11,2],[null,2],
+      [9,2],[null,2],
+      [null,4],
+      // Low bridge
       [-6,4],
+      [null,4],
+      [1,2],[null,4],[null,2],
+      // Development
       [13,1.5],[11,0.5],[9,2],
-      [8,1],[6,1],[8,1],[9,1],
+      [8,2],[null,2],
+      [6,1],[8,1],[9,1],[null,1],
+      [null,4],
+      // Build
+      [11,2],[13,2],
+      [16,2],[null,2],
       [13,2],[11,2],
-      [6,2],[1,2],
+      [null,4],
+      // Resolution
+      [9,2],[null,2],
+      [-6,4],
+      [null,4],
+      [6,2],[null,2],
     ],
     chords: [
       [-18,-15,-11,-6,-3],
@@ -476,8 +587,8 @@ function startSequencer(nav = null) {
   if (_seqTimer !== null) return;
   if (nav && typeof nav.seqSongIdx === 'number') {
     // Continuation: restore saved song position.
-    // Resume guard: reject positions with < 8 beats remaining to avoid
-    // "1–2 notes then 60s silence" — worse UX than starting the song fresh.
+    // Resume guard: reject positions with < 16 beats remaining to avoid
+    // "a few notes then a long gap" — worse UX than starting the song fresh.
     _seqNextT   = actx.currentTime + 0.15;
     _seqSongIdx = nav.seqSongIdx % SONGS.length;
     const song     = SONGS[_seqSongIdx];
@@ -489,7 +600,7 @@ function startSequencer(nav = null) {
       let beatsUsed = 0;
       for (let i = 0; i < resumeIdx; i++) beatsUsed += song.melody[i][1];
       const totalBeats = song.melody.reduce((s, [, b]) => s + b, 0);
-      if (totalBeats - beatsUsed < 8) resumeIdx = 0;
+      if (totalBeats - beatsUsed < 16) resumeIdx = 0;
     }
     _seqNoteIdx = resumeIdx;
     if (resumeIdx === 0) {
@@ -570,18 +681,17 @@ function _seqTick() {
       _seqLastBar = bar;
     }
 
-    _seqPiano(_semToHz(sem), _seqNextT, beats, beatS, fade);
+    if (sem !== null) _seqPiano(_semToHz(sem), _seqNextT, beats, beatS, fade);
     _seqNextT          += beats * beatS;
     _seqBeats          += beats;
     _seqBeatsSinceStart += beats;
     _seqNoteIdx++;
 
     if (_seqNoteIdx >= song.melody.length) {
-      // Short breath between songs — 0.3–0.6s, enough for a natural pause
-      // without the long silence that made it feel like the music froze.
-      // Songs fade out over their final FADE_OUT_BEATS and fade in over the
-      // first FADE_IN_BEATS, so the transition sounds like a smooth DJ mix.
-      _seqNextT  += 0.3 + Math.random() * 0.3;
+      // Minecraft-style silence between songs — 15–35 s of breathing room.
+      // The sequencer keeps polling every few seconds via the adaptive tick so
+      // it wakes up on time for the next song.
+      _seqNextT  += SONG_GAP_MIN_S + Math.random() * (SONG_GAP_MAX_S - SONG_GAP_MIN_S);
       _seqSongIdx = _nextSongIdx(_seqSongIdx);
       _seqNoteIdx = 0;
       _seqBeats   = 0;
@@ -594,7 +704,7 @@ function _seqTick() {
 
   // Poll slowly during silence (saves CPU), fast when actively scheduling.
   const ahead = _seqNextT - actx.currentTime;
-  const tickMs = ahead > 10 ? 2000 : SEQ_TICK_MS;
+  const tickMs = ahead > 30 ? 5000 : ahead > 10 ? 2000 : SEQ_TICK_MS;
   _seqTimer = setTimeout(_seqTick, tickMs);
 }
 
