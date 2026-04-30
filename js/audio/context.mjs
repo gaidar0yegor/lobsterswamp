@@ -292,11 +292,12 @@ const SONG_GAP_MAX_S = 35;
 
 // ── 2:59 AM Wager mode ──────────────────────────────────────
 // At 2:59 AM local time, the sequencer locks to the Soul Wager theme
-// for 30 minutes, then returns to normal rotation.
-const WAGER_SONG_IDX = 5;   // index in SONGS (appended below)
-const WAGER_START_H  = 2;
-const WAGER_START_M  = 59;
-const WAGER_DURATION = 30;  // minutes
+// for 30 minutes (8 movements), then returns to normal rotation.
+const WAGER_FIRST_IDX = 5;   // first movement index in SONGS
+const WAGER_LAST_IDX  = 12;  // last movement index (movements 5–12)
+const WAGER_START_H   = 2;
+const WAGER_START_M   = 59;
+const WAGER_DURATION  = 30;  // minutes
 
 function isWagerTime() {
   const now = new Date();
@@ -508,52 +509,347 @@ const SONGS = [
     ],
     bass: [-18,-13,-15,-20],
   },
-  // ── 2:59 AM: Soul Wager ─────────────────────────────────────────────────────
-  // Victorian Gothic / high-stakes noir. D minor, 68 BPM.
-  // Mirrors: driving staccato tension, mournful violin protagonist,
-  // deep brass devil, semitone crawl, waltz-like trap — per the Doplefy analysis.
-  { name: '2:59', theme: 'wager', bpm: 68,
+  // ── 2:59 AM: Soul Wager — 8 Movements ─────────────────────────────────────
+  // Victorian Gothic / high-stakes noir, D minor. Movements 5–12 play in
+  // sequence with zero inter-movement gap, then normal rotation resumes.
+
+  // I: The Man with the Top Hat — 56 BPM, pizzicato arrival, 3-note motif
+  { name: '2:59 I', theme: 'wager', bpm: 56, voices: ['cello'],
     melody: [
-      // The man with the top hat — sparse arrival
+      [null,4],[null,4],
+      [2,1],[null,1],[null,2],[null,4],                    // first knock
+      [2,1],[null,1],[5,1],[null,1],[null,4],              // second knock
+      [2,1],[5,1],[9,1],[null,1],[null,4],                 // 3-note motif
+      [null,4],[null,4],
+      // Phrase A — staccato violin motif, pizzicato bass
+      [2,2],[null,2],[5,1],[null,1],[5,1],[null,1],
+      [9,2],[7,1],[null,1],[5,3],[null,1],
+      [2,2],[null,2],[-3,4],[null,4],[null,4],
+      // Phrase B — development
+      [2,1],[null,1],[2,1],[null,1],[5,1],[7,1],[9,1],[null,1],
+      [10,3],[null,1],[9,2],[7,2],[5,2],[2,2],[-3,4],
+      [null,4],[null,4],
+      // Phrase A' — variation
+      [9,2],[null,2],[7,1],[5,1],[null,2],
+      [2,1],[5,1],[9,2],[10,3],[9,1],
+      [7,2],[5,2],[2,4],[null,4],[null,4],
+      // Phrase B' — fuller
+      [5,1],[null,1],[7,1],[null,1],[9,1],[null,1],[10,1],[null,1],
+      [12,2],[10,2],[9,1],[7,1],[5,1],[null,1],[2,2],
+      [-3,4],[null,4],[null,4],
+      // Coda — sparse echoes, fade
+      [2,1],[null,1],[5,1],[null,1],[9,2],[null,2],[null,4],
+      [-3,4],[2,2],[null,2],[null,4],[null,4],[null,4],
+    ],
+    chords: [[-22,-19,-15,-10,-7],[-15,-12,-8,-3,0],[-14,-10,-7,-2,2],[-17,-14,-10,-5,-2]],
+    bass: [-22,-15,-14,-17],
+  },
+
+  // II: Iron Rabbits — 76 BPM, chromatic staccato, mechanical heartbeat
+  { name: '2:59 II', theme: 'wager', bpm: 76, voices: ['strings'],
+    melody: [
       [null,4],
-      [2,2],[null,2],
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[2,1],[null,1],
+      [5,1],[4,1],[2,1],[null,1],[null,4],
+      // Phrase A — mechanical tick
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[5,1],[null,1],
+      [7,1],[null,1],[5,1],[null,1],[4,1],[null,1],[2,1],[null,1],
+      [5,1],[null,1],[5,1],[null,1],[7,1],[null,1],[9,1],[null,1],
+      [10,2],[9,1],[null,1],[7,2],[5,2],
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[2,1],[null,1],[null,4],
+      // Phrase B — chromatic descent
+      [9,1],[null,1],[8,1],[null,1],[7,1],[null,1],[5,1],[null,1],
+      [4,1],[null,1],[2,1],[null,1],[-1,2],
+      [-1,1],[null,1],[-3,1],[null,1],[null,4],
+      // Bridge — chromatic ascent
+      [-3,1],[null,1],[-1,1],[null,1],[2,1],[null,1],[4,1],[null,1],
+      [5,1],[null,1],[7,1],[null,1],[9,1],[null,1],[10,1],[null,1],
+      [12,2],[10,2],[9,2],[7,2],
+      // Phrase A × 2 (building intensity)
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[5,1],[null,1],
+      [7,1],[null,1],[5,1],[null,1],[4,1],[null,1],[2,1],[null,1],
+      [5,1],[null,1],[5,1],[null,1],[7,1],[null,1],[9,1],[null,1],
+      [10,2],[9,1],[null,1],[7,2],[5,2],
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[2,1],[null,1],[null,4],
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[5,1],[null,1],
+      [7,1],[null,1],[5,1],[null,1],[4,1],[null,1],[2,1],[null,1],
+      [5,1],[null,1],[5,1],[null,1],[7,1],[null,1],[9,1],[null,1],
+      [10,2],[9,1],[null,1],[7,2],[5,2],
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[2,1],[null,1],[null,4],
+      // Phrase B again
+      [9,1],[null,1],[8,1],[null,1],[7,1],[null,1],[5,1],[null,1],
+      [4,1],[null,1],[2,1],[null,1],[-1,2],[-1,1],[null,1],[-3,1],[null,1],[null,4],
+      // Phrase A × 2 — climax
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[5,1],[null,1],
+      [7,1],[null,1],[5,1],[null,1],[4,1],[null,1],[2,1],[null,1],
+      [5,1],[null,1],[5,1],[null,1],[7,1],[null,1],[9,1],[null,1],
+      [10,2],[9,1],[null,1],[7,2],[5,2],
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[2,1],[null,1],[null,4],
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[5,1],[null,1],
+      [7,1],[null,1],[5,1],[null,1],[4,1],[null,1],[2,1],[null,1],
+      [5,1],[null,1],[5,1],[null,1],[7,1],[null,1],[9,1],[null,1],
+      [10,2],[9,1],[null,1],[7,2],[5,2],
+      [2,1],[null,1],[2,1],[null,1],[4,1],[null,1],[2,1],[null,1],[null,4],
+      // Final surge
+      [-3,1],[null,1],[-1,1],[null,1],[2,1],[null,1],[4,1],[null,1],
+      [5,1],[null,1],[7,1],[null,1],[9,2],[10,2],[12,4],
+      [null,4],[null,4],[null,4],
+    ],
+    chords: [[-22,-19,-15,-10,-7],[-15,-12,-8,-3,0],[-14,-10,-7,-2,2],[-17,-14,-10,-5,-2]],
+    bass: [-22,-15,-14,-17],
+  },
+
+  // III: Phamtomm — 48 BPM, tremolo strings + sparse piano, ghost silence
+  { name: '2:59 III', theme: 'wager', bpm: 48, voices: ['strings'],
+    melody: [
+      [null,4],[null,4],[null,4],[null,4],
+      [14,4],[null,4],                            // high D5 — ghost call
+      [null,4],[null,4],
+      [12,3],[null,1],[null,4],
+      [null,4],[null,4],
+      [9,4],[null,4],[null,4],                    // A4 — descending ghost
+      [7,3],[null,1],[null,4],
+      [null,4],[null,4],
+      [5,4],[null,4],                             // F4
+      [null,4],[null,4],[null,4],
+      [14,2],[null,2],[12,2],[null,2],[9,4],       // descending from D5
+      [null,4],[null,4],[null,4],
+      [7,2],[null,2],[5,2],[null,2],
+      [2,4],[null,4],[null,4],
+      [null,4],[null,4],
+      [14,4],[12,2],[null,2],                     // ghost motif returns
+      [9,4],[null,4],[null,4],
+      [7,4],[5,4],[2,4],
+      [null,4],[null,4],[null,4],[null,4],         // long silence
+      [-3,4],[null,4],[null,4],[null,4],           // low B3 — barely audible
+      [null,4],[null,4],[null,4],[null,4],
+    ],
+    chords: [[-22,-19,-15,-10,-7],[-15,-12,-8,-3,0],[-14,-10,-7,-2,2],[-17,-14,-10,-5,-2]],
+    bass: [-22,-15,-14,-17],
+  },
+
+  // IV: In the Table — 76 BPM, waltz trap, heavy bass beat-1, call/response
+  { name: '2:59 IV', theme: 'wager', bpm: 76, voices: ['brass'],
+    melody: [
+      [null,4],[null,4],
+      // Call phrase (high strings)
+      [9,2],[null,2],[12,2],[null,2],
+      [10,2],[9,2],[7,4],
       [null,4],
-      [5,2],[null,2],
-      // Iron Rabbits — staccato heartbeat begins
-      [2,1],[null,1],[2,1],[null,1],
-      [5,1],[7,1],[9,1],[null,1],
-      [10,3],[null,1],
-      [9,2],[null,2],
-      // In the Table — waltz trap
+      // Response (low brass answer)
+      [2,2],[null,2],[5,2],[null,2],
+      [7,3],[5,1],[2,4],
       [null,4],
-      [2,1],[5,1],[2,1],[5,1],
-      [9,4],
-      [7,1],[5,1],[null,2],
-      // No trades — semitone crawl, no escape
-      [5,1],[4,1],[2,1],[null,1],
-      [-3,4],
+      // Call repeat
+      [9,2],[null,2],[12,2],[null,2],
+      [10,2],[9,2],[7,4],
       [null,4],
-      // The last Card — pressure peaks
-      [9,1],[10,1],[12,1],[null,1],
-      [14,4],
-      [12,1],[10,1],[9,1],[null,1],
+      // Response extended
+      [2,1],[5,1],[2,1],[null,1],[null,4],
+      [7,2],[5,2],[2,2],[null,2],[-3,4],[null,4],
+      // Development — waltz syncopation
       [null,4],
-      // The devil is evil — supernatural reckoning
-      [9,1],[null,1],[5,1],[null,1],
-      [-3,4],
-      [1,1],[2,1],[null,2],
+      [2,1],[5,1],[2,1],[5,1],[9,4],
+      [7,1],[5,1],[null,2],[null,4],
+      [2,1],[5,1],[7,1],[9,1],[10,4],
+      [9,1],[7,1],[5,1],[2,1],[null,4],
+      // Bridge
+      [-3,4],[null,4],[2,4],[null,4],
+      [5,2],[7,2],[9,4],
+      [10,2],[9,2],[7,4],[null,4],
+      // Call/response × 2
+      [9,2],[null,2],[12,2],[null,2],[10,2],[9,2],[7,4],[null,4],
+      [2,2],[null,2],[5,2],[null,2],[7,3],[5,1],[2,4],[null,4],
+      [9,2],[null,2],[12,2],[null,2],[10,2],[9,2],[7,4],[null,4],
+      [2,1],[5,1],[2,1],[null,1],[null,4],[7,2],[5,2],[2,2],[null,2],[-3,4],[null,4],
+      // Build — repeated waltz
+      [2,1],[5,1],[2,1],[5,1],[9,4],[7,1],[5,1],[null,2],[null,4],
+      [2,1],[5,1],[7,1],[9,1],[10,4],[9,1],[7,1],[5,1],[2,1],[null,4],
+      [2,1],[5,1],[2,1],[5,1],[9,4],[7,1],[5,1],[null,2],[null,4],
+      [12,4],[10,4],[9,4],[7,4],
+      // Final statement
+      [9,2],[null,2],[12,2],[null,2],[10,2],[9,2],[7,4],[null,4],
+      [2,2],[null,2],[5,2],[null,2],[7,3],[5,1],[2,4],[null,4],
+      [-3,4],[2,4],[null,4],[null,4],
+    ],
+    chords: [[-22,-19,-15,-10,-7],[-15,-12,-8,-3,0],[-14,-10,-7,-2,2],[-17,-14,-10,-5,-2]],
+    bass: [-22,-15,-14,-17],
+  },
+
+  // V: No Trades — 80 BPM, diminished chords, chromatic descent, escalating
+  { name: '2:59 V', theme: 'wager', bpm: 80, voices: [],
+    melody: [
       [null,4],
-      // For Samuel — grim resolution
-      [5,2],[2,2],
-      [2,4],
+      // Chromatic descent — no resolution
+      [9,2],[8,2],[7,2],[6,2],[5,4],
+      [4,2],[3,2],[2,2],[1,2],[0,4],
+      [-1,2],[-2,2],[-3,4],
       [null,4],
-      [null,4],
+      // Diminished climb
+      [2,2],[5,2],[8,2],[null,4],
+      [5,2],[8,2],[11,2],[null,4],
+      [8,2],[11,2],[14,2],[null,4],
+      // Descent again — faster feel
+      [14,1],[13,1],[12,1],[11,1],[10,1],[9,1],[8,1],[7,1],
+      [6,1],[5,1],[4,1],[3,1],[2,1],[1,1],[0,1],[-1,1],
+      [-2,1],[-3,1],[null,2],[null,4],
+      // Panic loop — staccato diminished arpeggio
+      [2,1],[null,1],[5,1],[null,1],[8,1],[null,1],[11,1],[null,1],
+      [2,1],[null,1],[5,1],[null,1],[8,1],[null,1],[11,1],[null,1],
+      [14,2],[null,2],[11,2],[null,2],[8,2],[null,2],
+      [5,2],[null,2],[2,2],[null,2],[null,4],
+      // Repeat chromatic descent
+      [9,2],[8,2],[7,2],[6,2],[5,4],
+      [4,2],[3,2],[2,2],[1,2],[0,4],
+      [-1,2],[-2,2],[-3,4],[null,4],
+      // Panic × 2
+      [2,1],[null,1],[5,1],[null,1],[8,1],[null,1],[11,1],[null,1],
+      [2,1],[null,1],[5,1],[null,1],[8,1],[null,1],[11,1],[null,1],
+      [14,2],[null,2],[11,2],[null,2],[8,2],[null,2],
+      [5,2],[null,2],[2,2],[null,2],[null,4],
+      [2,1],[null,1],[5,1],[null,1],[8,1],[null,1],[11,1],[null,1],
+      [2,1],[null,1],[5,1],[null,1],[8,1],[null,1],[11,1],[null,1],
+      [14,2],[null,2],[11,2],[null,2],[8,2],[null,2],
+      [5,2],[null,2],[2,2],[null,2],[null,4],
+      // Build to peak
+      [9,1],[8,1],[7,1],[6,1],[5,1],[4,1],[3,1],[2,1],
+      [5,1],[4,1],[3,1],[2,1],[1,1],[0,1],[-1,1],[-2,1],
+      [-3,4],[null,4],[null,4],
     ],
     chords: [
-      [-22,-19,-15,-10,-7],   // Dm: D-F-A spread
-      [-15,-12,-8,-3,0],      // Am: A-C-E spread
-      [-14,-10,-7,-2,2],      // Bb: Bb-D-F spread
-      [-17,-14,-10,-5,-2],    // Gm: G-Bb-D spread
+      [-22,-19,-16,-10,-7],   // Ddim: D-F-Ab
+      [-15,-12,-9,-3,0],      // Adim
+      [-17,-14,-11,-5,-2],    // Gdim
+      [-20,-17,-14,-8,-5],    // Edim
+    ],
+    bass: [-22,-15,-17,-20],
+  },
+
+  // VI: The Last Card — 80 BPM, grand orchestral surge, brass, suspension
+  { name: '2:59 VI', theme: 'wager', bpm: 80, voices: ['strings', 'brass'],
+    melody: [
+      // Rising brass fanfare
+      [null,4],[2,2],[5,2],[9,4],
+      [7,2],[9,2],[12,4],
+      [9,2],[12,2],[14,4],
+      // Suspension — held high D
+      [14,4],[14,4],[14,4],
+      // Resolution attempt
+      [12,2],[10,2],[9,4],
+      [7,2],[9,2],[12,4],
+      [null,4],
+      // Grand theme — full orchestra
+      [2,1],[5,1],[9,1],[12,1],[14,4],
+      [12,2],[10,2],[9,4],
+      [7,1],[9,1],[12,1],[14,1],[16,4],
+      [14,2],[12,2],[10,4],
+      // Suspension at peak
+      [14,4],[14,4],[null,4],
+      [9,4],[9,4],[null,4],
+      // Development
+      [2,2],[5,2],[7,4],[9,4],
+      [10,2],[9,2],[7,4],
+      [5,2],[7,2],[9,4],[null,4],
+      // Brass response
+      [-3,4],[2,4],[5,4],[9,4],
+      [12,4],[14,4],[16,4],[null,4],
+      // Rising sequence × 2
+      [2,1],[5,1],[9,1],[12,1],[14,4],
+      [12,2],[10,2],[9,4],[7,2],[9,2],[12,4],[null,4],
+      [2,1],[5,1],[9,1],[12,1],[14,4],
+      [12,2],[10,2],[9,4],[7,2],[9,2],[12,4],[null,4],
+      // Climax — fortissimo
+      [14,2],[14,2],[16,4],[14,4],
+      [12,4],[10,4],[9,4],
+      [7,2],[5,2],[2,4],[null,4],
+      // Suspension again — the last card is played
+      [14,8],                    // long held note
+      [null,4],[null,4],
+      [9,8],
+      [null,4],[null,4],
+      // Final grand sweep
+      [2,1],[5,1],[9,1],[12,1],[14,1],[12,1],[10,1],[9,1],
+      [7,2],[5,2],[2,4],
+      [-3,4],[null,4],[null,4],[null,4],
+    ],
+    chords: [[-22,-19,-15,-10,-7],[-15,-12,-8,-3,0],[-14,-10,-7,-2,2],[-17,-14,-10,-5,-2]],
+    bass: [-22,-15,-14,-17],
+  },
+
+  // VII: The Devil is Evil — 52 BPM, cello growl, dissonant clusters, jump scares
+  { name: '2:59 VII', theme: 'wager', bpm: 52, voices: ['cello'],
+    melody: [
+      [null,4],[null,4],
+      // Growling cello descent
+      [2,3],[1,1],[null,4],
+      [1,3],[0,1],[null,4],
+      [0,3],[-1,1],[null,4],
+      [-1,3],[-3,1],[null,4],
+      // Jump scare — sudden high accent
+      [14,1],[null,3],[null,4],
+      // Dissonant cluster motif (semitone pair)
+      [2,1],[3,1],[null,2],[5,1],[6,1],[null,2],
+      [9,1],[10,1],[null,2],[null,4],
+      // Growl continues
+      [-3,3],[-5,1],[null,4],
+      [2,3],[1,1],[null,4],
+      // Jump scare × 2
+      [16,1],[null,3],[12,1],[null,3],
+      // Cluster arpeggio — panic
+      [2,1],[3,1],[5,1],[6,1],[8,1],[9,1],[11,1],[12,1],
+      [null,4],
+      // Deep cello pedal
+      [-3,4],[-3,4],[-3,4],
+      // Dissonant chord stabs
+      [2,1],[3,1],[null,2],[5,1],[6,1],[null,2],
+      [9,1],[10,1],[null,2],[2,1],[3,1],[null,2],
+      // Silence — dread
+      [null,4],[null,4],[null,4],
+      // Final jump scare
+      [14,1],[null,1],[16,1],[null,1],[null,4],
+      [-3,4],[-3,4],
+      [2,3],[1,1],[0,1],[-1,1],[-3,2],
+      [null,4],[null,4],[null,4],
+    ],
+    chords: [
+      [-22,-21,-15,-10,-7],   // Dm + chromatic dissonance
+      [-15,-14,-8,-3,0],
+      [-14,-13,-7,-2,2],
+      [-17,-16,-10,-5,-2],
+    ],
+    bass: [-22,-15,-14,-17],
+  },
+
+  // VIII: For Samuel — 44 BPM, solo violin, major/minor ambiguity, final silence
+  { name: '2:59 VIII', theme: 'wager', bpm: 44, voices: ['strings'],
+    melody: [
+      [null,4],[null,4],
+      // Crying violin solo — D major/minor ambiguity
+      [2,3],[4,1],[null,4],              // D major hint (E = 4)
+      [5,3],[4,1],[null,4],              // F slides to E
+      [9,4],[null,4],
+      [7,3],[5,1],[null,4],
+      [4,2],[5,2],[null,4],              // E→F — back to minor
+      [2,4],[null,4],[null,4],
+      // Second phrase — more painful
+      [9,3],[10,1],[9,3],[7,1],
+      [5,4],[null,4],
+      [7,3],[9,1],[null,4],
+      [4,3],[5,1],[null,4],
+      [2,4],[null,4],
+      // Breathing — tempo feels like it's slowing (long notes)
+      [2,6],[null,2],[null,4],
+      [5,6],[null,2],[null,4],
+      [9,8],
+      [null,4],[null,4],[null,4],
+      // Final — barely a note
+      [2,4],[null,4],[null,4],[null,4],[null,4],[null,4],
+    ],
+    chords: [
+      [-22,-19,-15,-10,-6],   // Dm with added major 3rd (F# ambiguity)
+      [-15,-12,-8,-3,1],
+      [-14,-10,-6,-2,2],
+      [-17,-14,-10,-5,-1],
     ],
     bass: [-22,-15,-14,-17],
   },
@@ -624,6 +920,62 @@ function _seqBass(n, t, fade = 1) {
   o.start(t); o.stop(t + 0.56);
 }
 
+// String ensemble — two slightly detuned sawtooth oscillators for warmth
+function _seqStrings(freq, t, dur, fade = 1) {
+  if (!actx) return;
+  const V = 0.022 * VOL_SCALE * fade;
+  [0, 4].forEach(cents => {
+    const o = actx.createOscillator(), e = actx.createGain();
+    const filt = actx.createBiquadFilter();
+    o.type = 'sawtooth';
+    o.frequency.value = freq * Math.pow(2, cents / 1200);
+    filt.type = 'lowpass'; filt.frequency.value = 2200;
+    o.connect(filt); filt.connect(e); e.connect(masterGain);
+    e.gain.setValueAtTime(0, t);
+    e.gain.linearRampToValueAtTime(V, t + 0.12);
+    e.gain.setValueAtTime(V * 0.75, t + dur * 0.75);
+    e.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.start(t); o.stop(t + dur + 0.01);
+  });
+}
+
+// Cello — low register sawtooth + resonant filter, growling timbre
+function _seqCello(freq, t, dur, fade = 1) {
+  if (!actx) return;
+  const V = 0.038 * VOL_SCALE * fade;
+  const o = actx.createOscillator(), e = actx.createGain();
+  const filt = actx.createBiquadFilter();
+  o.type = 'sawtooth';
+  o.frequency.value = freq * 0.5;   // octave lower = cello register
+  filt.type = 'lowpass'; filt.frequency.value = 900; filt.Q.value = 3;
+  o.connect(filt); filt.connect(e); e.connect(masterGain);
+  e.gain.setValueAtTime(0, t);
+  e.gain.linearRampToValueAtTime(V, t + 0.09);
+  e.gain.setValueAtTime(V * 0.8, t + dur * 0.65);
+  e.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.start(t); o.stop(t + dur + 0.01);
+}
+
+// Brass — sawtooth + filter envelope (closed → open = bright attack)
+function _seqBrass(freq, t, dur, fade = 1) {
+  if (!actx) return;
+  const V = 0.028 * VOL_SCALE * fade;
+  const o = actx.createOscillator(), e = actx.createGain();
+  const filt = actx.createBiquadFilter();
+  o.type = 'sawtooth'; o.frequency.value = freq;
+  filt.type = 'lowpass'; filt.Q.value = 1.2;
+  filt.frequency.setValueAtTime(300, t);
+  filt.frequency.linearRampToValueAtTime(1800, t + 0.14);
+  filt.frequency.setValueAtTime(1200, t + dur * 0.5);
+  filt.frequency.linearRampToValueAtTime(400, t + dur);
+  o.connect(filt); filt.connect(e); e.connect(masterGain);
+  e.gain.setValueAtTime(0, t);
+  e.gain.linearRampToValueAtTime(V, t + 0.14);
+  e.gain.setValueAtTime(V * 0.8, t + dur * 0.7);
+  e.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.start(t); o.stop(t + dur + 0.01);
+}
+
 let _seqNoteIdx        = 0;
 let _seqNextT          = 0;
 let _seqBeats          = 0;
@@ -633,12 +985,18 @@ let _seqPlaylist       = [];
 let _seqBeatsSinceStart = 0;  // beats elapsed in current song (for crossfade)
 let _seqSongBeats       = 0;  // total beats in current song (for crossfade)
 
-// Returns next song index, never repeating the current song back-to-back.
-// Shuffles the remaining songs each time the playlist is exhausted.
-// During 2:59–3:29 AM, always returns WAGER_SONG_IDX.
+// Returns next song index. During 2:59–3:29 AM, steps through the 8 wager
+// movements in order. After all 8 complete, returns to normal rotation.
 function _nextSongIdx(currentIdx) {
-  if (isWagerTime()) return WAGER_SONG_IDX;
-  const normalCount = SONGS.length - 1; // exclude wager song from normal rotation
+  if (isWagerTime()) {
+    // Step through movements 5→12 in order
+    if (currentIdx >= WAGER_FIRST_IDX && currentIdx < WAGER_LAST_IDX) {
+      return currentIdx + 1;
+    }
+    return WAGER_FIRST_IDX;  // start from movement I (or restart after all done)
+  }
+  // Normal shuffle — exclude all wager movements
+  const normalCount = WAGER_FIRST_IDX; // songs 0..4 are normal
   if (_seqPlaylist.length === 0) {
     const indices = Array.from({ length: normalCount }, (_, i) => i).filter(i => i !== currentIdx);
     for (let i = indices.length - 1; i > 0; i--) {
@@ -681,8 +1039,8 @@ function startSequencer(nav = null) {
     }
     _seqSongBeats = SONGS[_seqSongIdx].melody.reduce((s, [, b]) => s + b, 0);
   } else {
-    // Fresh start: boot into wager song at 2:59 AM, else always begin with Swamp
-    const startIdx = isWagerTime() ? WAGER_SONG_IDX : 0;
+    // Fresh start: boot into first wager movement at 2:59 AM, else always begin with Swamp
+    const startIdx = isWagerTime() ? WAGER_FIRST_IDX : 0;
     _seqNextT    = actx.currentTime + 0.5;
     _seqSongIdx  = startIdx;
     _seqNoteIdx  = 0;
@@ -749,18 +1107,30 @@ function _seqTick() {
       _seqLastBar = bar;
     }
 
-    if (sem !== null) _seqPiano(_semToHz(sem), _seqNextT, beats, beatS, fade);
+    if (sem !== null) {
+      const freq = _semToHz(sem);
+      const dur  = beats * beatS;
+      _seqPiano(freq, _seqNextT, beats, beatS, fade);
+      // Extra voices for wager movements
+      if (song.voices?.includes('strings')) _seqStrings(freq, _seqNextT, dur, fade);
+      if (song.voices?.includes('cello'))   _seqCello(freq, _seqNextT, dur, fade);
+      if (song.voices?.includes('brass'))   _seqBrass(freq, _seqNextT, dur, fade);
+    }
     _seqNextT          += beats * beatS;
     _seqBeats          += beats;
     _seqBeatsSinceStart += beats;
     _seqNoteIdx++;
 
     if (_seqNoteIdx >= song.melody.length) {
-      // Minecraft-style silence between songs — 15–35 s of breathing room.
-      // The sequencer keeps polling every few seconds via the adaptive tick so
-      // it wakes up on time for the next song.
-      _seqNextT  += SONG_GAP_MIN_S + Math.random() * (SONG_GAP_MAX_S - SONG_GAP_MIN_S);
-      _seqSongIdx = _nextSongIdx(_seqSongIdx);
+      // Between wager movements: zero gap (seamless orchestral transition).
+      // Between normal songs: Minecraft-style 15–35 s silence.
+      const isWagerMovement = _seqSongIdx >= WAGER_FIRST_IDX && _seqSongIdx <= WAGER_LAST_IDX;
+      const nextIdx = _nextSongIdx(_seqSongIdx);
+      const nextIsWager = nextIdx >= WAGER_FIRST_IDX && nextIdx <= WAGER_LAST_IDX;
+      if (!(isWagerMovement && nextIsWager)) {
+        _seqNextT += SONG_GAP_MIN_S + Math.random() * (SONG_GAP_MAX_S - SONG_GAP_MIN_S);
+      }
+      _seqSongIdx = nextIdx;
       _seqNoteIdx = 0;
       _seqBeats   = 0;
       _seqLastBar = -1;
@@ -1052,13 +1422,13 @@ export async function boot() {
   // the 2:59 AM mode at the right moment without requiring a page reload.
   setInterval(() => {
     if (!isUnlocked || isMuted || !_seqTimer) return;
-    const inWager  = isWagerTime();
-    const currWager = _seqSongIdx === WAGER_SONG_IDX;
+    const inWager   = isWagerTime();
+    const currWager = _seqSongIdx >= WAGER_FIRST_IDX && _seqSongIdx <= WAGER_LAST_IDX;
     if (inWager && !currWager) {
-      // 2:59 AM just hit — skip to end of current song so next pick is wager
+      // 2:59 AM just hit — skip to end of current song so next pick is wager movement I
       _seqNoteIdx = SONGS[_seqSongIdx]?.melody.length ?? 0;
     }
-    // Exit is automatic: when wager song ends after 3:29 AM, _nextSongIdx
+    // Exit is automatic: when the last wager movement ends after 3:29 AM, _nextSongIdx
     // returns a normal song because isWagerTime() will be false.
   }, 30_000); // check every 30 s
 
