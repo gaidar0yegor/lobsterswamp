@@ -293,8 +293,8 @@ const SONG_GAP_MAX_S = 35;
 // ── 2:59 AM Wager mode ──────────────────────────────────────
 // At 2:59 AM local time, the sequencer locks to the Soul Wager theme
 // for 30 minutes (8 movements), then returns to normal rotation.
-const WAGER_FIRST_IDX = 5;   // first movement index in SONGS
-const WAGER_LAST_IDX  = 12;  // last movement index (movements 5–12)
+const WAGER_FIRST_IDX = 6;   // first movement index in SONGS
+const WAGER_LAST_IDX  = 13;  // last movement index (movements 6–13)
 const WAGER_START_H   = 2;
 const WAGER_START_M   = 59;
 const WAGER_DURATION  = 30;  // minutes
@@ -509,11 +509,54 @@ const SONGS = [
     ],
     bass: [-18,-13,-15,-20],
   },
+  // Tide — F minor, 112 BPM. Staccato 8th-note arpeggio hook + stepwise
+  // development. Real melodic structure with adult harmonic rhythm.
+  { name: 'Tide', theme: 'tide', bpm: 112,
+    melody: [
+      // Intro — pads/bass establish grid before melody
+      [null,4],[null,4],
+      // Hook A — staccato 8th-note arpeggio (Fm 7th climb: F-Ab-C-Eb-F)
+      [5,0.5],[null,0.5],[8,0.5],[null,0.5],[12,1],[15,1],
+      [17,2],[15,1],[12,1],
+      [null,2],
+      // Hook A descent — same shape, resolving
+      [12,1],[10,1],[8,1],[5,1],
+      [7,2],[5,2],
+      [null,4],
+      // Bridge B — stepwise climb through scale
+      [5,1],[7,1],[8,1],[10,1],
+      [12,2],[15,2],
+      [17,1],[15,1],[12,1],[10,1],
+      [8,4],
+      [null,2],
+      // Peak — long notes, wide register (Ab5 apex)
+      [20,2],[17,2],
+      [15,2],[12,2],
+      [10,2],[8,2],
+      [5,4],[null,4],
+      // Hook A reprise
+      [5,0.5],[null,0.5],[8,0.5],[null,0.5],[12,1],[15,1],
+      [17,2],[15,1],[12,1],
+      [null,2],
+      [12,1],[10,1],[8,1],[5,1],
+      [7,2],[5,2],
+      // Coda
+      [null,4],[5,2],[null,2],[null,4],[null,4],
+    ],
+    chords: [
+      [-19,-16,-12,-7,-4],   // Fm  (F-Ab-C-F-Ab)
+      [-24,-21,-17,-12,-9],  // Cm  (C-Eb-G-C-Eb)
+      [-16,-12,-9,-4,0],     // Ab  (Ab-C-Eb-Ab-C)
+      [-21,-17,-14,-9,-5],   // Eb  (Eb-G-Bb-Eb-G)
+    ],
+    bass: [-19,-24,-16,-21],
+  },
+
   // ── 2:59 AM: Soul Wager — 8 Movements ─────────────────────────────────────
-  // Victorian Gothic / high-stakes noir, D minor. Movements 5–12 play in
+  // Victorian Gothic / high-stakes noir, D minor. Movements 6–13 play in
   // sequence with zero inter-movement gap, then normal rotation resumes.
 
-  // I: The Man with the Top Hat — 56 BPM, pizzicato arrival, 3-note motif
+  // VI: The Man with the Top Hat — 56 BPM, pizzicato arrival, 3-note motif
   { name: '2:59 I', theme: 'wager', bpm: 56, voices: ['cello'],
     melody: [
       [null,4],[null,4],
